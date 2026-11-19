@@ -1,0 +1,68 @@
+# Builds livewall.exe on every push and pull request, and publishes a
+# GitHub release with the zip whenever a version tag (v*) is pushed:
+#
+#   git tag -a v0.2.0 -m "livewall v0.2.0"
+#   git push origin v0.2.0
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to create releases on tags
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        shell: cmd
+        run: call build.bat
+
+      - name: Check the exe stays small
+        shell: pwsh
+        run: |
+          $size = (Get-Item build\livewall.exe).Length
+          "livewall.exe: $size bytes"
+          if ($size -gt 200KB) { throw "livewall.exe grew past 200 KB" }
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "dev-$($env:GITHUB_SHA.Substring(0,7))" }
+          $dir = "build\package\livewall"
+          New-Item -ItemType Directory -Force "$dir\examples" | Out-Null
+          Copy-Item build\livewall.exe, README.md, LICENSE $dir
+          Copy-Item examples\plasma.hlsl "$dir\examples"
+          $zip = "livewall-$version-windows-x64.zip"
+          Compress-Archive -Path "$dir\*" -DestinationPath "build\$zip" -Force
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.version }}
+          path: build/${{ steps.package.outputs.zip }}
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $zip = "build\${{ steps.package.outputs.zip }}"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $zip --clobber
+          } else {
+            gh release create $tag $zip --title "livewall $tag" --generate-notes
+          }

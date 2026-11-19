@@ -35,7 +35,7 @@ Run `build\livewall.exe`. The first time, it opens the settings window and regis
 | `livewall.exe -quit` | Stop the wallpaper |
 | `livewall.exe -snapshot <id or file> <out.png> [seconds]` | Render one frame to a PNG |
 
-Settings are stored in `%APPDATA%\livewall\config.ini`. Turning off *Start with Windows* removes the scheduled task.
+Settings are stored in `%APPDATA%\livewall\config.ini`.
 
 ## It pauses when
 
@@ -71,6 +71,37 @@ To share work between platforms, the shaders and the settings format will move i
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it is built
 - [docs/FINDINGS.md](docs/FINDINGS.md): how it gets behind the icons, measurements, Windows quirks
 - [docs/STATUS.md](docs/STATUS.md): what works, what is untested, known limitations
+
+## What livewall changes on your PC
+
+- **Start with Windows** (on by default) adds a scheduled task named `livewall` that starts it when you sign in.
+- Settings are stored in `%APPDATA%\livewall`.
+- Choosing a **still picture** sets it as your normal Windows wallpaper. That's how it costs no memory.
+
+Nothing else: no registry changes, no services, no drivers.
+
+## Uninstall
+
+1. Open livewall's settings and turn off **Start with Windows**, which removes the scheduled task. Then right-click the tray icon → **Exit**.
+2. Delete the folder that holds `livewall.exe`, and the `%APPDATA%\livewall` folder.
+3. If you used a still picture, your Windows wallpaper stays as it is. Change it in **Settings → Personalization → Background**.
+
+If livewall is already gone but still starts at sign-in, remove the task with:
+
+```
+schtasks /Delete /TN livewall /F
+```
+
+## Privacy
+
+livewall does not connect to the internet. It does not transfer any information to other networked systems, and it collects no data.
+
+## Code signing policy
+
+Release builds are made by [GitHub Actions](.github/workflows/build.yml) from the source code in this repository, so anyone can check what went into them. Releases are currently **not code-signed**; signing is planned.
+
+- Committers and reviewers: [Mann Devani](https://github.com/manndevani)
+- Approvers: [Mann Devani](https://github.com/manndevani)
 
 ## Support livewall
 
