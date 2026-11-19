@@ -16,6 +16,8 @@ build.bat
 
 Output: `build\livewall.exe`.
 
+Or skip building: download `livewall.exe` from the [Releases](https://github.com/manndevani/LiveWallpaper/releases) page and run it. Windows may show a "Windows protected your PC" warning because the file isn't code-signed. Click **More info → Run anyway**.
+
 ## Use
 
 Run `build\livewall.exe`. The first time, it opens the settings window and registers itself to start at sign-in.
@@ -69,6 +71,10 @@ To share work between platforms, the shaders and the settings format will move i
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it is built
 - [docs/FINDINGS.md](docs/FINDINGS.md): how it gets behind the icons, measurements, Windows quirks
 - [docs/STATUS.md](docs/STATUS.md): what works, what is untested, known limitations
+
+## Contributing
+
+Bug reports, shaders, testing on other hardware and ports are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
