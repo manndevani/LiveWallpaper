@@ -24,6 +24,10 @@ Last updated: 2026-11-20
 - [x] If Windows refuses a picture, livewall falls back to drawing it itself (seen in testing).
 
 - [x] Public release v0.1.0 on GitHub (2026-11-20), with the zip attached; a fresh download matched the local build.
+- [x] Shader resolution **Auto** (default), Full or Half (2026-11-20):
+  - Auto renders 1:1 on this 1920×1080 screen, measured at ~100 ms/s GPU vs ~27 at half.
+  - The settings switch saves `resolution=` and removes the old `scale=` key; both directions were clicked and checked.
+  - Not yet released: needs v0.1.1.
 - [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
 
 ## Releasing

@@ -2,11 +2,12 @@
 #
 #   .\tools\measure.ps1                                 current wallpaper, as configured
 #   .\tools\measure.ps1 -Wallpaper builtin:dunes -Render  force rendering even if the desktop is covered
+#   .\tools\measure.ps1 -Resolution 2                   shader resolution: 0 auto, 1 full, 2 half
 #
 # Restarts the engine, waits for it to settle, then samples for -Seconds.
 # -Render temporarily turns off "pause when covered" so the cost of actually
 # drawing is measured; the original config is always restored.
-param([string]$Wallpaper = '', [switch]$Render, [int]$Seconds = 10)
+param([string]$Wallpaper = '', [switch]$Render, [int]$Seconds = 10, [int]$Resolution = -1)
 
 $exe = Join-Path $PSScriptRoot '..\build\livewall.exe' | Resolve-Path
 $cfg = Join-Path $env:APPDATA 'livewall\config.ini'
@@ -24,6 +25,10 @@ try {
     $t = $backup
     if ($Wallpaper) { $t = Set-Key $t 'current' $Wallpaper }
     if ($Render) { $t = Set-Key $t 'pause_when_covered' '0' }
+    if ($Resolution -ge 0) {
+        $t = $t -replace '(?m)^(scale|resolution)=.*\r?\n', ''
+        $t = $t -replace '(?m)^\[engine\]\r?\n', "[engine]`r`nresolution=$Resolution`r`n"
+    }
     Write-Config $t
 
     Start-Process $exe -ArgumentList "-quit" -Wait

@@ -44,7 +44,9 @@ BOOL config_load(Config *c)
     c->speed = get_uint(path, L"wallpaper", L"speed", 100, 10, 400);
     c->brightness = get_uint(path, L"wallpaper", L"brightness", 100, 10, 100);
     c->fps = get_uint(path, L"engine", L"fps", 30, 1, 240);
-    c->scale = get_uint(path, L"engine", L"scale", 2, 1, 4);
+    /* "resolution" replaced the old "scale" key (default half) in 0.1.1, so
+       existing installs move to the new default, Auto. */
+    c->scale = get_uint(path, L"engine", L"resolution", 0, 0, 4);
     c->pause_covered = get_uint(path, L"engine", L"pause_when_covered", 1, 0, 1);
     c->pause_battery = get_uint(path, L"engine", L"pause_on_battery", 1, 0, 1);
     c->low_power = get_uint(path, L"engine", L"integrated_gpu", 0, 0, 1);
@@ -85,7 +87,8 @@ void config_save(const Config *c)
     put_uint(path, L"wallpaper", L"speed", c->speed);
     put_uint(path, L"wallpaper", L"brightness", c->brightness);
     put_uint(path, L"engine", L"fps", c->fps);
-    put_uint(path, L"engine", L"scale", c->scale);
+    put_uint(path, L"engine", L"resolution", c->scale);
+    WritePrivateProfileStringW(L"engine", L"scale", NULL, path); /* pre-0.1.1 key */
     put_uint(path, L"engine", L"pause_when_covered", c->pause_covered ? 1 : 0);
     put_uint(path, L"engine", L"pause_on_battery", c->pause_battery ? 1 : 0);
     put_uint(path, L"engine", L"integrated_gpu", c->low_power ? 1 : 0);

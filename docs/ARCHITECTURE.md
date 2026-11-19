@@ -75,7 +75,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 ## Rendering
 
 - One swap chain covers the whole virtual desktop: FLIP_DISCARD with `DXGI_SCALING_STRETCH`.
-- Shaders render at half resolution by default; DWM upscales for free.
+- Shader resolution is chosen from the display by default (`resolution=0`, Auto): 1:1 up to 2560×1600 pixels, and 1/2 or less on bigger desktops (4K, wide multi-monitor), where DWM upscales for free. Full (`1`) and Half (`2`) can be picked in settings.
 - Video and images always render at full resolution.
 - `FrameConsts` (64 bytes) carries:
   - resolution;

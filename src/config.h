@@ -24,7 +24,7 @@ extern const UINT g_builtin_count;
 typedef struct {
     WCHAR current[MAX_PATH]; /* "builtin:<name>" or a file path */
     UINT fps;                /* frame cap while visible */
-    UINT scale;              /* shaders render at 1/scale resolution */
+    UINT scale;              /* shaders render at 1/scale resolution; 0 = auto from the display */
     UINT speed;              /* animation speed, percent */
     UINT brightness;         /* percent */
     Fit fit;                 /* images and video */

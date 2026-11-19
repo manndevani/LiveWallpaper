@@ -51,6 +51,20 @@ Measured with `tools/measure.ps1 -Render`, forced to render even though windows 
 - "Private WS" is what Task Manager shows as Memory. Trimming (`SetProcessWorkingSetSize(-1, -1)` plus `HeapCompact`) moves pages to the standby list. They come back as soft faults when drawing resumes, which is cheap. Committed memory does not shrink. Freeing the decoder (video) and handing pictures to Windows does shrink it.
 - Below ~10 MB while *rendering* is not reachable on Windows: the user-mode GPU driver alone is about that size.
 
+### Shader resolution: half vs full (2026-11-20, same machine, 1920×1080)
+
+Half resolution (960×540, stretched by DWM) looked visibly soft on a 1080p screen, so the default became Auto (full resolution up to 2560×1600).
+
+| Shader | Half: GPU | Full: GPU | Memory (both) |
+|---|---|---|---|
+| Aurora | 27 ms/s | 98 ms/s | 14.4 MB |
+| Dunes | 28 ms/s | 104 ms/s | 14.4 MB |
+
+- Full resolution costs about 3.7× the GPU time: roughly 4× the pixels, minus fixed per-frame overhead.
+- That is about 3.3 ms of GPU work per frame at 30 fps. Memory and CPU don't change.
+- It still pauses at zero cost when covered or on battery.
+- Measure with `tools\measure.ps1 -Render -Resolution 1|2`.
+
 ## Packaged-app AppData redirection (2026-11-20)
 
 - When livewall is launched from inside a packaged (MSIX) app, such as a terminal hosted by a Store-packaged app, Windows redirects its `%APPDATA%` writes to `%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\`. That folder is invisible to Explorer and to the same exe launched normally.

@@ -135,11 +135,28 @@ void gfx_free(void)
     RELEASE(gfx.dev);
 }
 
+/* Most pixels a shader draws when the resolution is "Auto" (2560x1600).
+   Up to this the shader renders 1:1 with the screen; larger desktops
+   (4K, wide multi-monitor) render at 1/2 or less and the compositor scales
+   them up, so the GPU cost stays about the same on any display. */
+#define AUTO_MAX_PIXELS (2560u * 1600u)
+
+/* scale 0 means "Auto": pick it from the desktop size. */
+static UINT pick_scale(UINT w, UINT h, UINT scale)
+{
+    if (scale)
+        return scale;
+    scale = 1;
+    while (scale < 4 && (ULONGLONG)(w / scale) * (h / scale) > AUTO_MAX_PIXELS)
+        scale++;
+    return scale;
+}
+
 static void set_sizes(UINT w, UINT h, UINT scale)
 {
     gfx.ww = w;
     gfx.wh = h;
-    gfx.scale = scale ? scale : 1;
+    gfx.scale = pick_scale(w, h, scale);
     gfx.bw = max(1, (w + gfx.scale - 1) / gfx.scale);
     gfx.bh = max(1, (h + gfx.scale - 1) / gfx.scale);
 }
@@ -196,7 +213,7 @@ BOOL gfx_resize(UINT w, UINT h, UINT scale)
 {
     if (!gfx.sc)
         return FALSE;
-    if (w == gfx.ww && h == gfx.wh && (scale ? scale : 1) == gfx.scale)
+    if (w == gfx.ww && h == gfx.wh && pick_scale(w, h, scale) == gfx.scale)
         return TRUE;
     gfx_unbind();
     RELEASE(gfx.rtv);

@@ -24,7 +24,8 @@ Run `build\livewall.exe`. The first time, it opens the settings window and regis
 
 - **Tray icon:** click for settings; right-click to switch wallpaper, add files, pause, toggle *Start with Windows* or exit.
 - **Settings:** click a card to apply it. Use **Add wallpaper** for videos (`mp4 mov mkv webm wmv avi`), GIFs, images (`png jpg bmp webp tif jxr`) or shaders (`.hlsl`).
-  - Adjust speed, brightness, frame cap, shader quality or fit (cover/contain/stretch).
+  - Adjust speed, brightness, frame cap, shader resolution or fit (cover/contain/stretch).
+  - Shader resolution **Auto** (the default) draws sharp at your screen's own resolution, and lowers it only on very large desktops (4K and up). **Half** uses about a quarter of the GPU time.
   - Choose when to pause.
 
 | Command | Effect |

@@ -51,7 +51,8 @@ enum {
 
 const UINT kFps[] = {15, 30, 60};
 const WCHAR *const kFpsLabel[] = {L"15", L"30", L"60"};
-const WCHAR *const kQualityLabel[] = {L"Half", L"Full"};
+const UINT kQuality[] = {0, 1, 2}; /* config scale: auto, full, half */
+const WCHAR *const kQualityLabel[] = {L"Auto", L"Full", L"Half"};
 const WCHAR *const kFitLabel[] = {L"Cover", L"Contain", L"Stretch"};
 const WCHAR *const kFilters[] = {L"All", L"Shaders", L"Interactive", L"Videos", L"Images"};
 const int FILTERS = 5;
@@ -728,7 +729,7 @@ void draw_inspector()
     } else {
         text(L"shader resolution", R(x, y, x + w, y + 18), s.f_mono, s.th.faint);
         y += 20;
-        segmented(x, y, w, kQualityLabel, 2, cfg.scale == 1 ? 1 : 0, ID_QUALITY);
+        segmented(x, y, w, kQualityLabel, 3, cfg.scale == 0 ? 0 : cfg.scale == 1 ? 1 : 2, ID_QUALITY);
     }
 }
 
@@ -925,8 +926,8 @@ void activate(int id)
     } else if (id >= ID_FPS && id < ID_FPS + 3) {
         cfg.fps = kFps[id - ID_FPS];
         apply(false);
-    } else if (id >= ID_QUALITY && id < ID_QUALITY + 2) {
-        cfg.scale = id == ID_QUALITY ? 2 : 1;
+    } else if (id >= ID_QUALITY && id < ID_QUALITY + 3) {
+        cfg.scale = kQuality[id - ID_QUALITY];
         apply(false);
     } else if (id >= ID_FIT && id < ID_FIT + 3) {
         cfg.fit = (Fit)(id - ID_FIT);
