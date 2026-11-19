@@ -34,6 +34,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 
 | File | Responsibility |
 |---|---|
+| `version.h`, `livewall.rc` | Version number and the exe's file details |
 | `main.c` | `entry()`: argument parsing and role dispatch, per-monitor DPI v2 |
 | `util.c` | CRT replacements (`memset/memcpy`, strings), app dir, log file, drawn app icon, dark popup menus |
 | `config.c/.h` | `Config` load/save, built-in list, `kind_of()` by extension, library add/remove |

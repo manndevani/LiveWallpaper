@@ -23,6 +23,23 @@ Last updated: 2026-11-20
   - still picture **0.5 MB**: handed to Windows' own wallpaper, with brightness applied through a dimmed copy (verified).
 - [x] If Windows refuses a picture, livewall falls back to drawing it itself (seen in testing).
 
+- [x] Public release v0.1.0 on GitHub (2026-11-20), with the zip attached; a fresh download matched the local build.
+- [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
+
+## Releasing
+
+1. Bump `src/version.h`.
+2. Commit and push.
+3. `git tag -a vX.Y.Z -m "livewall vX.Y.Z"` and `git push origin vX.Y.Z`.
+
+GitHub Actions (`.github/workflows/build.yml`) builds the exe and creates the release with the zip. Every push to `main` also builds, and the zip is kept as a downloadable workflow artifact.
+
+**Code signing:** applying to SignPath Foundation (free for open source). Once approved:
+- add a signing step to the workflow, after Package and before Publish;
+- add the line "Free code signing provided by SignPath.io, certificate by SignPath Foundation" to the README's Code signing policy section.
+
+SignPath's conditions: the build must be verifiable from source, each signing needs manual approval, product name and version must be set, GitHub needs MFA, and the README needs a code signing policy, privacy statement and uninstall steps.
+
 ## Implemented but not yet verified
 
 - [ ] **Actual start after a reboot or sign-out.** The task is registered but has not run yet (`Last Run Time: never`). Check after the next sign-in that the wallpaper appears and the log shows `engine started`.
