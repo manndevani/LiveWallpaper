@@ -34,7 +34,7 @@ Last updated: 2026-11-20
 
 GitHub Actions (`.github/workflows/build.yml`) builds the exe and creates the release with the zip. Every push to `main` also builds, and the zip is kept as a downloadable workflow artifact.
 
-**Code signing:** applying to SignPath Foundation (free for open source). Once approved:
+**Code signing:** application to SignPath Foundation (free for open source) submitted on 2026-11-20; waiting for their review. Once approved:
 - add a signing step to the workflow, after Package and before Publish;
 - add the line "Free code signing provided by SignPath.io, certificate by SignPath Foundation" to the README's Code signing policy section.
 
