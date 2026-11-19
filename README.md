@@ -72,6 +72,15 @@ To share work between platforms, the shaders and the settings format will move i
 - [docs/FINDINGS.md](docs/FINDINGS.md): how it gets behind the icons, measurements, Windows quirks
 - [docs/STATUS.md](docs/STATUS.md): what works, what is untested, known limitations
 
+## Support livewall
+
+livewall is free and always will be. If it makes your desktop nicer and you'd like to help keep it going:
+
+- ❤️ [Sponsor on GitHub](https://github.com/sponsors/manndevani)
+- ☕ [Buy me a coffee](https://buymeacoffee.com/manndevani)
+
+Starring the repo and telling a friend helps too.
+
 ## Contributing
 
 Bug reports, shaders, testing on other hardware and ports are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
