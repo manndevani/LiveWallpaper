@@ -27,7 +27,7 @@ Last updated: 2026-11-20
 - [x] Shader resolution **Auto** (default), Full or Half (2026-11-20):
   - Auto renders 1:1 on this 1920×1080 screen, measured at ~100 ms/s GPU vs ~27 at half.
   - The settings switch saves `resolution=` and removes the old `scale=` key; both directions were clicked and checked.
-  - Not yet released: needs v0.1.1.
+  - Released in v0.1.1.
 - [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
 
 ## Releasing
