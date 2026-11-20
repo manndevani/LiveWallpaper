@@ -728,10 +728,10 @@ void draw_lock(float x, float y, float w)
         y += 36;
         toggle(x, y, w, L"Ask for password", l.secure != 0, ID_LOCK_SECURE);
         y += 26;
+        toggle(x, y, w, L"Ctrl+Alt+L shows it and locks", cfg.lock_hotkey != 0, ID_LOCK_HOTKEY);
+        y += 26;
     }
     toggle(x, y, w, L"Same picture on lock screen", cfg.lock_picture != 0, ID_LOCK_PICTURE);
-    y += 26;
-    toggle(x, y, w, L"Ctrl+Alt+L shows it and locks", cfg.lock_hotkey != 0, ID_LOCK_HOTKEY);
     y += 34;
     button(R(x, y, x + w, y + 30), L"\xE768", L"Preview", ID_LOCK_PREVIEW, false);
     y += 42;
@@ -739,7 +739,9 @@ void draw_lock(float x, float y, float w)
     y += 10;
     const WCHAR *note = !l.ours && l.other ? L"Turning this on replaces your current screen saver."
                         : !l.ours && cfg.lock_hotkey
-                            ? L"Until \"Show when idle\" is on, Ctrl+Alt+L just locks the PC, like Windows+L."
+                            /* word joiners keep "Ctrl+Alt+L" on one line */
+                            ? L"Turn on \"Show when idle\" to use Ctrl\x2060+\x2060" L"Alt\x2060+\x2060L with your "
+                              L"wallpaper. Until then, it just locks the PC."
                         : l.ours && !l.secure
                             ? L"Anyone can use the PC when it ends. Turn on \"Ask for password\" to lock it."
                             : L"Windows checks your password, not livewall. When you come back, the normal Windows "
