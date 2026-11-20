@@ -1,40 +1,110 @@
-# livewall
+<h1 align="center">livewall</h1>
 
-A tiny live wallpaper for Windows 10/11: shaders, videos, GIFs, images and your own HLSL shaders, drawn behind the desktop icons.
+<p align="center">
+  <b>Free, open-source live wallpaper for Windows 10 and 11.</b><br>
+  Animated shader, video, GIF and picture wallpapers behind your desktop icons, using about <b>3 MB</b> of memory.
+</p>
 
-- **Light:** a ~90 KB exe with no runtime and no installer. About 3 MB of memory and ~0.1% CPU for a shader wallpaper while it draws. It stops drawing completely whenever nobody can see it.
-- **Starts with Windows**, early: a logon task starts it before the usual startup apps.
-- **Settings window** that follows your light/dark theme and accent color. It runs as a separate process, so the wallpaper itself never carries UI memory.
+<p align="center">
+  <a href="https://github.com/manndevani/LiveWallpaper/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/manndevani/LiveWallpaper?label=download&style=for-the-badge"></a>
+  <img alt="Size" src="https://img.shields.io/badge/size-94%20KB-2a78d6?style=for-the-badge">
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2a78d6?style=for-the-badge">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a78d6?style=for-the-badge"></a>
+</p>
 
-## Requirements
+<p align="center"><img src="docs/images/aurora.jpg" alt="Aurora live wallpaper on Windows 11" width="820"></p>
 
-- Windows 10 or 11, 64-bit.
-- Any DirectX 10-class GPU or newer: AMD Radeon, Intel HD/UHD/Iris/Arc, NVIDIA GeForce/Quadro/RTX (roughly 2008 onward). There is no vendor-specific code. On laptops with two GPUs, livewall uses the one driving your main screen, or the integrated one if you turn on *Use integrated GPU*.
-- No GPU driver (some virtual machines)? livewall draws on the CPU instead, at a lower resolution.
+## Why livewall
 
-Tested so far on Intel + NVIDIA. If you run it on AMD, a report in [Issues](https://github.com/manndevani/LiveWallpaper/issues) helps.
+| | |
+|---|---|
+| 🪶 **94 KB** | The whole app is one small `.exe`. No installer, no runtime, no account. |
+| 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
+| 💤 **0% GPU** | When a window covers the desktop, it stops drawing completely. |
+| ⚡ **~0.1% CPU** | While it plays. The GPU does the work. |
+| 🖥️ **Sharp** | Draws at your screen's own resolution. |
+| 🆓 **Free forever** | MIT-licensed, no ads, no tracking, no internet access. |
 
-## Build
+<p align="center"><img src="docs/images/memory.svg" alt="livewall memory use: video 14 MB, settings window 3–4 MB, shader 3 MB, still picture 0.5 MB, paused 0.3 MB" width="760"></p>
 
-Requires Visual Studio 2022 (or the Build Tools) with **Desktop development with C++**.
+## Wallpapers
+
+Five animated wallpapers come built in, and they loop seamlessly. *Ripples* and *Glow Grid* react to your mouse.
+
+| | |
+|---|---|
+| <img src="docs/images/aurora.jpg" alt="Aurora animated wallpaper" width="400"><br>**Aurora** | <img src="docs/images/dunes.jpg" alt="Dunes animated wallpaper" width="400"><br>**Dunes** |
+| <img src="docs/images/nightsky.jpg" alt="Night Sky animated wallpaper" width="400"><br>**Night Sky** | <img src="docs/images/ripples.jpg" alt="Ripples interactive wallpaper" width="400"><br>**Ripples** (interactive) |
+| <img src="docs/images/glowgrid.jpg" alt="Glow Grid interactive wallpaper" width="400"><br>**Glow Grid** (interactive) | **Add your own**<br>🎬 Video wallpapers: mp4, mov, mkv, webm, wmv, avi<br>🖼️ GIF and picture wallpapers: gif, png, jpg, webp…<br>✨ Shader wallpapers: write your own in HLSL ([guide](docs/CUSTOM_SHADERS.md)) |
+
+## Settings
+
+<p align="center"><img src="docs/images/settings.png" alt="livewall settings window" width="640"></p>
+
+Click a wallpaper to apply it. Adjust speed, brightness, frame rate, resolution and fit. It follows your light/dark theme and accent color.
+
+## Download and run
+
+1. Download the zip from **[Releases](https://github.com/manndevani/LiveWallpaper/releases/latest)**.
+2. Unzip it and run `livewall.exe`.
+3. Pick a wallpaper. Done. It starts with Windows from now on.
+
+> Windows may say "Windows protected your PC", because the app isn't code-signed yet. Click **More info → Run anyway**.
+
+## Smart pausing
+
+livewall stops drawing whenever nobody can see it:
+
+- a window or a game covers the screen (maximized and fullscreen apps count),
+- the PC is locked or the display is off,
+- the laptop is on battery (optional).
+
+After a moment paused, it gives its memory back to Windows (0.3 MB). Still pictures cost nothing: Windows shows them itself.
+
+## FAQ
+
+**Does it slow down games?** No. Fullscreen and maximized apps cover the desktop, so livewall pauses at 0% GPU.
+
+**Does it work on my GPU?** Any DirectX 10-class GPU or newer: AMD, Intel or NVIDIA. With no GPU driver (some virtual machines), it draws on the CPU instead. So far it's been tested on Intel + NVIDIA; AMD reports are welcome in [Issues](https://github.com/manndevani/LiveWallpaper/issues).
+
+**Laptop with two GPUs?** It uses the GPU that drives your screen. Turn on *Use integrated GPU* to save even more power.
+
+**Is there sound?** No. Video wallpapers are always muted.
+
+**Does it phone home?** No. livewall never connects to the internet.
+
+## Coming next
+
+| Platform | Status |
+|---|---|
+| Windows 10 / 11 | ✅ Available |
+| Linux (KDE, Sway, Hyprland, X11) | 🛠️ Planned |
+| macOS | 🛠️ Planned |
+| Android | 🛠️ Planned |
+| iPhone / iPad | ⚠️ iOS doesn't allow live wallpapers; video/Live Photo export planned |
+
+## Support livewall
+
+livewall is free and always will be. If it makes your desktop nicer:
+
+- ❤️ [Sponsor on GitHub](https://github.com/sponsors/manndevani)
+- ☕ [Buy me a coffee](https://buymeacoffee.com/manndevani)
+- ⭐ Star this repo and tell a friend
+
+Bug reports, wallpapers, testing on other hardware and ports are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+<details>
+<summary><b>Build from source</b></summary>
+
+You need Visual Studio 2022 (or the Build Tools) with **Desktop development with C++**. Then run:
 
 ```
 build.bat
 ```
 
-Output: `build\livewall.exe`.
-
-Or skip building: download `livewall.exe` from the [Releases](https://github.com/manndevani/LiveWallpaper/releases) page and run it. Windows may show a "Windows protected your PC" warning because the file isn't code-signed. Click **More info → Run anyway**.
-
-## Use
-
-Run `build\livewall.exe`. The first time, it opens the settings window and registers itself to start at sign-in.
-
-- **Tray icon:** click for settings; right-click to switch wallpaper, add files, pause, toggle *Start with Windows* or exit.
-- **Settings:** click a card to apply it. Use **Add wallpaper** for videos (`mp4 mov mkv webm wmv avi`), GIFs, images (`png jpg bmp webp tif jxr`) or shaders (`.hlsl`).
-  - Adjust speed, brightness, frame cap, shader resolution or fit (cover/contain/stretch).
-  - Shader resolution **Auto** (the default) draws sharp at your screen's own resolution, and lowers it only on very large desktops (4K and up). **Half** uses about a quarter of the GPU time.
-  - Choose when to pause.
+The output is `build\livewall.exe`. Written in plain C on Direct3D 11, with no C runtime. See [ARCHITECTURE.md](docs/ARCHITECTURE.md), [FINDINGS.md](docs/FINDINGS.md) and [STATUS.md](docs/STATUS.md).
 
 | Command | Effect |
 |---|---|
@@ -44,62 +114,29 @@ Run `build\livewall.exe`. The first time, it opens the settings window and regis
 | `livewall.exe -quit` | Stop the wallpaper |
 | `livewall.exe -snapshot <id or file> <out.png> [seconds]` | Render one frame to a PNG |
 
-Settings are stored in `%APPDATA%\livewall\config.ini`.
+</details>
 
-## It pauses when
+<details>
+<summary><b>What livewall changes on your PC, and how to uninstall</b></summary>
 
-- windows cover every pixel of every monitor (maximized and fullscreen apps count);
-- the session is locked or the display is off;
-- the PC is on battery (optional);
-- you pause it.
-
-When paused, the last frame stays on screen, at zero GPU cost. After a couple of seconds paused, livewall gives its memory back to Windows: about **0.3 MB** for a paused shader and **1.2 MB** for a paused video.
-
-**Still pictures cost nothing:** livewall hands them to Windows as the normal desktop wallpaper and keeps only its tray icon (about **0.5 MB**).
-
-## Interactive and custom wallpapers
-
-*Ripples* and *Glow Grid* react to your cursor and clicks on the desktop. Write your own in HLSL: see [docs/CUSTOM_SHADERS.md](docs/CUSTOM_SHADERS.md).
-
-## Roadmap: other platforms
-
-The goal is the lightest live wallpaper on every platform that allows one.
-
-| Platform | Possible? | How |
-|---|---|---|
-| Windows 10/11 | ✅ done | Direct3D 11 behind the desktop icons |
-| Linux | ✅ planned | Wayland `wlr-layer-shell` background layer (KDE, Sway, Hyprland…), X11 desktop window; OpenGL ES. GNOME needs an extension. |
-| macOS | ✅ planned | Borderless window at desktop level, under the icons; Metal |
-| Android | ✅ planned | The official `WallpaperService` live-wallpaper API; OpenGL ES |
-| iPhone / iPad | ⚠️ limited | iOS doesn't let apps run live wallpapers. The best possible is exporting a wallpaper as a video or Live Photo that you set yourself. |
-
-To share work between platforms, the shaders and the settings format will move into a common core first.
-
-## More
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it is built
-- [docs/FINDINGS.md](docs/FINDINGS.md): how it gets behind the icons, measurements, Windows quirks
-- [docs/STATUS.md](docs/STATUS.md): what works, what is untested, known limitations
-
-## What livewall changes on your PC
-
-- **Start with Windows** (on by default) adds a scheduled task named `livewall` that starts it when you sign in.
+- **Start with Windows** (on by default) adds a scheduled task named `livewall`.
 - Settings are stored in `%APPDATA%\livewall`.
-- Choosing a **still picture** sets it as your normal Windows wallpaper. That's how it costs no memory.
+- Choosing a **still picture** sets it as your normal Windows wallpaper.
 
 Nothing else: no registry changes, no services, no drivers.
 
-## Uninstall
+**To uninstall:**
+1. Open the settings and turn off **Start with Windows**.
+2. Right-click the tray icon → **Exit**.
+3. Delete `livewall.exe` and the `%APPDATA%\livewall` folder.
 
-1. Open livewall's settings and turn off **Start with Windows**, which removes the scheduled task. Then right-click the tray icon → **Exit**.
-2. Delete the folder that holds `livewall.exe`, and the `%APPDATA%\livewall` folder.
-3. If you used a still picture, your Windows wallpaper stays as it is. Change it in **Settings → Personalization → Background**.
-
-If livewall is already gone but still starts at sign-in, remove the task with:
+If it still starts at sign-in, remove the task with:
 
 ```
 schtasks /Delete /TN livewall /F
 ```
+
+</details>
 
 ## Privacy
 
@@ -112,19 +149,8 @@ Release builds are made by [GitHub Actions](.github/workflows/build.yml) from th
 - Committers and reviewers: [Mann Devani](https://github.com/manndevani)
 - Approvers: [Mann Devani](https://github.com/manndevani)
 
-## Support livewall
-
-livewall is free and always will be. If it makes your desktop nicer and you'd like to help keep it going:
-
-- ❤️ [Sponsor on GitHub](https://github.com/sponsors/manndevani)
-- ☕ [Buy me a coffee](https://buymeacoffee.com/manndevani)
-
-Starring the repo and telling a friend helps too.
-
-## Contributing
-
-Bug reports, shaders, testing on other hardware and ports are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## License
 
 MIT: free for everyone to use, change and share. See [LICENSE](LICENSE).
+
+<sub>Keywords: live wallpaper for Windows 11, animated wallpaper for Windows 10, video wallpaper, GIF wallpaper, desktop customization, lightweight live wallpaper, free open-source wallpaper app, shader wallpaper, interactive wallpaper.</sub>

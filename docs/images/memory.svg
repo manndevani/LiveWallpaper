@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 262" width="760" height="262" role="img" aria-labelledby="t d">
+  <title id="t">How much memory livewall uses</title>
+  <desc id="d">Task Manager memory: video wallpaper 14 MB, settings window open 3 to 4 MB, shader wallpaper 3 MB, still picture 0.5 MB, paused 0.3 MB.</desc>
+  <style>
+    .title { font: 600 17px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0b0b0b; }
+    .label { font: 14px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0b0b0b; }
+    .value { font: 600 14px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0b0b0b; }
+    .note  { font: 12px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #52514e; }
+    .bar   { fill: #2a78d6; }
+    .axis  { stroke: #d6d5d0; stroke-width: 1; }
+    @media (prefers-color-scheme: dark) {
+      .title, .label, .value { fill: #f0efec; }
+      .note { fill: #c3c2b7; }
+      .bar  { fill: #3987e5; }
+      .axis { stroke: #3a3a37; }
+    }
+  </style>
+
+  <text class="title" x="16" y="28">How much memory livewall uses</text>
+  <text class="note" x="16" y="48">Task Manager, Memory column, Windows 11 at 1920×1080.</text>
+
+  <line class="axis" x1="220" y1="64" x2="220" y2="236"/>
+
+  <!-- scale: 15 MB = 440 px -->
+  <text class="label" x="208" y="89" text-anchor="end">Video wallpaper</text>
+  <rect class="bar" x="220" y="74" width="411" height="22" rx="3"/>
+  <text class="value" x="639" y="90">14 MB</text>
+
+  <text class="label" x="208" y="123" text-anchor="end">Settings window open</text>
+  <rect class="bar" x="220" y="108" width="103" height="22" rx="3"/>
+  <text class="value" x="331" y="124">3–4 MB</text>
+
+  <text class="label" x="208" y="157" text-anchor="end">Shader wallpaper</text>
+  <rect class="bar" x="220" y="142" width="88" height="22" rx="3"/>
+  <text class="value" x="316" y="158">3 MB</text>
+
+  <text class="label" x="208" y="191" text-anchor="end">Still picture</text>
+  <rect class="bar" x="220" y="176" width="15" height="22" rx="3"/>
+  <text class="value" x="243" y="192">0.5 MB</text>
+
+  <text class="label" x="208" y="225" text-anchor="end">Paused / covered</text>
+  <rect class="bar" x="220" y="210" width="9" height="22" rx="3"/>
+  <text class="value" x="237" y="226">0.3 MB</text>
+
+  <text class="note" x="16" y="256">Settings window: 0 MB once closed (it is a separate process).</text>
+</svg>
