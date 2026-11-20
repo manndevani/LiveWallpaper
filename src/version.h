@@ -4,5 +4,5 @@
 
 #define LW_VERSION_MAJOR 0
 #define LW_VERSION_MINOR 1
-#define LW_VERSION_PATCH 2
-#define LW_VERSION_STR "0.1.2"
+#define LW_VERSION_PATCH 3
+#define LW_VERSION_STR "0.1.3"
