@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>Free, open-source live wallpaper for Windows 10 and 11.</b><br>
-  Animated shader, video, GIF and picture wallpapers behind your desktop icons, using about <b>3 MB</b> of memory.
+  Animated, video, GIF and picture wallpapers behind your desktop icons, using about <b>3 MB</b> of memory.
 </p>
 
 <p align="center">
@@ -18,10 +18,10 @@
 
 | The numbers | What they mean |
 |---|---|
-| 🪶 **94 KB** | The whole app is one small `.exe`. No installer, no runtime, no account. |
+| 🪶 **94 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
 | 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
-| 💤 **0% GPU** | When a window covers the desktop, it stops drawing completely. |
-| ⚡ **~0.1% CPU** | While it plays. The GPU does the work. |
+| 💤 **0% GPU** | When a window covers the desktop, it stops completely and uses no graphics power. |
+| ⚡ **~0.1% CPU** | Barely touches your processor. The graphics card does the work. |
 | 🖥️ **Sharp** | Draws at your screen's own resolution. |
 | 🆓 **Free forever** | MIT-licensed, no ads, no tracking, no internet access. |
 
@@ -29,7 +29,7 @@
 
 ## Wallpapers
 
-Five animated wallpapers come built in, and they loop seamlessly. *Ripples* and *Glow Grid* react to your mouse.
+Five animated wallpapers come built in, and they repeat smoothly with no visible jump. *Ripples* and *Glow Grid* react to your mouse.
 
 <table>
   <tr>
@@ -72,15 +72,15 @@ After a moment paused, it gives its memory back to Windows (0.3 MB). Still pictu
 
 ## FAQ
 
-**Does it slow down games?** No. Fullscreen and maximized apps cover the desktop, so livewall pauses at 0% GPU.
+**Does it slow down games?** No. Fullscreen and maximized apps cover the desktop, so livewall pauses and uses no graphics power.
 
-**Does it work on my GPU?** Any DirectX 10-class GPU or newer: AMD, Intel or NVIDIA. With no GPU driver (some virtual machines), it draws on the CPU instead. So far it's been tested on Intel + NVIDIA; AMD reports are welcome in [Issues](https://github.com/manndevani/LiveWallpaper/issues).
+**Does it work on my graphics card?** Yes, on any graphics card from about 2008 onward: AMD, Intel or NVIDIA. If there is no graphics driver (for example in some virtual machines), it uses the processor instead. So far it's been tested on Intel + NVIDIA; AMD reports are welcome in [Issues](https://github.com/manndevani/LiveWallpaper/issues).
 
-**Laptop with two GPUs?** It uses the GPU that drives your screen. Turn on *Use integrated GPU* to save even more power.
+**Laptop with two graphics chips?** It uses the one that drives your screen. Turn on *Use integrated GPU* to save even more power.
 
 **Is there sound?** No. Video wallpapers are always muted.
 
-**Does it phone home?** No. livewall never connects to the internet.
+**Does it send my data anywhere?** No. livewall never connects to the internet.
 
 ## Coming next
 
@@ -100,7 +100,7 @@ livewall is free and always will be. If it makes your desktop nicer:
 - ☕ [Buy me a coffee](https://buymeacoffee.com/manndevani)
 - ⭐ Star this repo and tell a friend
 
-Bug reports, wallpapers, testing on other hardware and ports are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, wallpapers, testing on other PCs and help with the Linux, Mac and Android versions are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
