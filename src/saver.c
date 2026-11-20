@@ -16,7 +16,7 @@
 
 #define SAVER_CLASS APP L"_saver"
 #define MOVE_PX 10     /* mouse movement that ends the screen saver */
-#define GRACE_MS 600   /* ignore movement right after starting (e.g. the Preview click) */
+#define GRACE_MS 600   /* ignore movement and keys right after starting (the Preview click, the shortcut keys) */
 
 static Config cfg; /* large: keep it off the stack */
 
@@ -65,6 +65,11 @@ static LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
+        /* Keys still held from the lock shortcut repeat; only a new press counts. */
+        if ((l & (1 << 30)) || GetTickCount() - v.started < GRACE_MS)
+            return 0;
+        finish();
+        return 0;
     case WM_LBUTTONDOWN:
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:

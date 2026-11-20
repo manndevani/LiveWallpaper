@@ -134,3 +134,33 @@ void lock_refresh(void)
         return;
     log_line(L"screen saver: could not update %s", scr);
 }
+
+/* The lock shortcut. Asks Windows to start the screen saver now, the same
+   way it does after the idle time, so Windows itself watches it and locks
+   the PC when it ends. Without livewall's screen saver, it simply locks. */
+BOOL lock_now(void)
+{
+    LockState s;
+    DWORD_PTR r;
+    lock_query(&s);
+    if (!s.ours || !s.secure) {
+        log_line(L"lock shortcut: screen saver %s, locking directly", s.ours ? L"has no password" : L"is off");
+        LockWorkStation();
+        return FALSE; /* nothing to check afterwards */
+    }
+    SendMessageTimeoutW(GetDesktopWindow(), WM_SYSCOMMAND, SC_SCREENSAVE, 0, SMTO_ABORTIFHUNG, 1000, &r);
+    log_line(L"lock shortcut: screen saver started");
+    return TRUE;
+}
+
+/* Called a moment after lock_now: if the screen saver did not start (for
+   example Windows refused), lock the normal way, so the shortcut always locks. */
+void lock_check(void)
+{
+    BOOL running = FALSE;
+    SystemParametersInfoW(SPI_GETSCREENSAVERRUNNING, 0, &running, 0);
+    if (!running) {
+        log_line(L"lock shortcut: screen saver did not start, locking directly");
+        LockWorkStation();
+    }
+}

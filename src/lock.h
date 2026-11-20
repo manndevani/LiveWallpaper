@@ -30,6 +30,15 @@ BOOL lock_apply(BOOL on, UINT minutes, BOOL secure);
    as this exe after an update. Cheap: compares size and date. */
 void lock_refresh(void);
 
+/* The lock shortcut (Ctrl+Alt+L): starts the screen saver now. If it is not
+   livewall's, or "Ask for password" is off, locks the PC directly instead.
+   Returns TRUE when it started the screen saver: then call lock_check()
+   about 1.5 s later. */
+BOOL lock_now(void);
+void lock_check(void);
+#define LOCK_HOTKEY_MODS (MOD_CONTROL | MOD_ALT)
+#define LOCK_HOTKEY_KEY 'L'
+
 /* livewall.exe /s, /p <hwnd>, /c: run as the screen saver. */
 int saver_run(const WCHAR *arg, const WCHAR *rest);
 

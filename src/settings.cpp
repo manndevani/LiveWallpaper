@@ -54,7 +54,7 @@ enum {
     ID_FIT = 80,      /* + index */
     ID_FOLDER = 90,
     ID_TAB = 100,     /* + 0 desktop, 1 lock screen */
-    ID_LOCK_ON = 110, ID_LOCK_SAME, ID_LOCK_SECURE, ID_LOCK_PICTURE, ID_LOCK_PREVIEW,
+    ID_LOCK_ON = 110, ID_LOCK_SAME, ID_LOCK_SECURE, ID_LOCK_PICTURE, ID_LOCK_PREVIEW, ID_LOCK_HOTKEY,
     ID_LOCK_WAIT = 120, /* + index */
 };
 
@@ -730,12 +730,16 @@ void draw_lock(float x, float y, float w)
         y += 26;
     }
     toggle(x, y, w, L"Same picture on lock screen", cfg.lock_picture != 0, ID_LOCK_PICTURE);
+    y += 26;
+    toggle(x, y, w, L"Ctrl+Alt+L shows it and locks", cfg.lock_hotkey != 0, ID_LOCK_HOTKEY);
     y += 34;
     button(R(x, y, x + w, y + 30), L"\xE768", L"Preview", ID_LOCK_PREVIEW, false);
     y += 42;
     line(x, y + 0.5f, x + w, y + 0.5f, s.th.line);
     y += 10;
     const WCHAR *note = !l.ours && l.other ? L"Turning this on replaces your current screen saver."
+                        : !l.ours && cfg.lock_hotkey
+                            ? L"Until \"Show when idle\" is on, Ctrl+Alt+L just locks the PC, like Windows+L."
                         : l.ours && !l.secure
                             ? L"Anyone can use the PC when it ends. Turn on \"Ask for password\" to lock it."
                             : L"Windows checks your password, not livewall. When you come back, the normal Windows "
@@ -1121,6 +1125,9 @@ void activate(int id)
         set_lock(TRUE, kWait[id - ID_LOCK_WAIT], s.lock.secure);
     } else if (id == ID_LOCK_SECURE) {
         set_lock(TRUE, s.lock.minutes, !s.lock.secure);
+    } else if (id == ID_LOCK_HOTKEY) {
+        cfg.lock_hotkey = !cfg.lock_hotkey;
+        apply(false); /* the engine owns the shortcut */
     } else if (id == ID_LOCK_PICTURE) {
         cfg.lock_picture = !cfg.lock_picture;
         config_save(&cfg);

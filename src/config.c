@@ -54,6 +54,7 @@ BOOL config_load(Config *c)
     GetPrivateProfileStringW(L"engine", L"autostart_exe", L"", c->autostart_exe, MAX_PATH + 16, path);
     GetPrivateProfileStringW(L"lockscreen", L"wallpaper", L"", c->lock, MAX_PATH, path);
     c->lock_picture = get_uint(path, L"lockscreen", L"match_picture", 0, 0, 1);
+    c->lock_hotkey = get_uint(path, L"lockscreen", L"shortcut", 1, 0, 1);
 
     n = get_uint(path, L"library", L"count", 0, 0, LIB_MAX);
     c->lib_count = 0;
@@ -98,6 +99,7 @@ void config_save(const Config *c)
     WritePrivateProfileStringW(L"engine", L"autostart_exe", c->autostart_exe, path);
     WritePrivateProfileStringW(L"lockscreen", L"wallpaper", c->lock, path);
     put_uint(path, L"lockscreen", L"match_picture", c->lock_picture ? 1 : 0);
+    put_uint(path, L"lockscreen", L"shortcut", c->lock_hotkey ? 1 : 0);
 
     WritePrivateProfileStringW(L"library", NULL, NULL, path); /* rewrite the whole section */
     put_uint(path, L"library", L"count", c->lib_count);

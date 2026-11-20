@@ -419,6 +419,22 @@ static void poll(void)
     busy = FALSE;
 }
 
+/* Ctrl+Alt+L: see lock_now(). Another app may own the keys already. */
+static void update_hotkey(void)
+{
+    static BOOL on;
+    if (cfg.lock_hotkey == on)
+        return;
+    if (cfg.lock_hotkey) {
+        on = RegisterHotKey(e.msg, 1, LOCK_HOTKEY_MODS | MOD_NOREPEAT, LOCK_HOTKEY_KEY);
+        if (!on)
+            log_line(L"Ctrl+Alt+L is already used by another app (%u)", GetLastError());
+    } else {
+        UnregisterHotKey(e.msg, 1);
+        on = FALSE;
+    }
+}
+
 static void reload(void)
 {
     WCHAR prev[MAX_PATH];
@@ -428,6 +444,7 @@ static void reload(void)
 
     str_copy(prev, cfg.current, MAX_PATH);
     config_load(&cfg);
+    update_hotkey();
     source_fit = cfg.fit;
     source_speed = cfg.speed / 100.0f;
     if (e.still && str_ieq(prev, cfg.current)) {
@@ -573,7 +590,18 @@ static LRESULT CALLBACK msg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
     }
     switch (m) {
+    case WM_HOTKEY:
+        if (w == 1 && lock_now())
+            SetTimer(h, 2, 1500, NULL);
+        return 0;
     case WM_TIMER:
+        if (w == 2) {
+            KillTimer(h, 2);
+            lock_check();
+            return 0;
+        }
+        poll();
+        return 0;
     case WM_DISPLAYCHANGE:
         poll();
         return 0;
@@ -669,6 +697,7 @@ void engine_run(BOOL quiet)
     e.wm_status = RegisterWindowMessageW(MSG_STATUS);
     e.wm_pause = RegisterWindowMessageW(MSG_PAUSE);
     e.msg = CreateWindowExW(WS_EX_TOOLWINDOW, ENGINE_CLASS, APP, WS_POPUP, 0, 0, 0, 0, NULL, NULL, inst, NULL);
+    update_hotkey();
 
     e.icon = make_app_icon(GetSystemMetrics(SM_CXSMICON));
     e.status = ST_WAITING;

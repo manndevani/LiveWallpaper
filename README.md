@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/manndevani/LiveWallpaper/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/manndevani/LiveWallpaper?label=download&style=for-the-badge"></a>
-  <img alt="Size" src="https://img.shields.io/badge/size-125%20KB-2a78d6?style=for-the-badge">
+  <img alt="Size" src="https://img.shields.io/badge/size-126%20KB-2a78d6?style=for-the-badge">
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2a78d6?style=for-the-badge">
   <img alt="Linux" src="https://img.shields.io/badge/Linux-Wayland%20%7C%20X11-2a78d6?style=for-the-badge">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a78d6?style=for-the-badge"></a>
@@ -21,7 +21,7 @@
 
 | The numbers | What they mean |
 |---|---|
-| 🪶 **125 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
+| 🪶 **126 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
 | 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
 | 💤 **0% GPU** | When a window covers the desktop, it stops completely and uses no graphics power. |
 | ⚡ **~0.1% CPU** | Barely touches your processor. The graphics card does the work. |
@@ -62,6 +62,10 @@ Click a wallpaper to apply it. Adjust speed, brightness, frame rate, resolution 
 livewall can also show a live wallpaper when your PC sits idle, and it can be a different one from your desktop. Open the settings, switch to **Lock screen**, pick a wallpaper and turn on **Show when idle**.
 
 Your PC stays as safe as before. livewall never asks for or checks your password: it runs as a Windows screen saver, and with **Ask for password** on (the default), Windows locks the PC when it ends, so the normal Windows sign-in screen asks for your password. **Same picture on lock screen** makes that sign-in screen show a still picture of the same wallpaper.
+
+**Lock with your wallpaper:** press **Ctrl+Alt+L** when you step away. Your live wallpaper plays right away, and when you come back and click, Windows asks for your PIN or password. (Windows+L belongs to Windows and keeps working as usual.)
+
+To go straight to the PIN box, without the Windows clock screen in between (Windows Pro): open `gpedit.msc` → Computer Configuration → Administrative Templates → Control Panel → Personalization → turn on **Do not display the lock screen**.
 
 ## Download and run
 
