@@ -6,7 +6,9 @@
 extern "C" {
 #endif
 
-void settings_run(BOOL add);
+enum { SETTINGS_MAIN, SETTINGS_ADD, SETTINGS_LOCK }; /* what to show first */
+
+void settings_run(int page);
 
 #ifdef __cplusplus
 }

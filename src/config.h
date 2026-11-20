@@ -30,6 +30,8 @@ typedef struct {
     Fit fit;                 /* images and video */
     BOOL pause_covered, pause_battery, low_power, autostart;
     WCHAR autostart_exe[MAX_PATH + 16]; /* what the startup task runs: "<exe> -startup" */
+    WCHAR lock[MAX_PATH];    /* lock screen wallpaper; empty = same as the desktop */
+    BOOL lock_picture;       /* also set the Windows lock screen picture to match */
     UINT lib_count;
     WCHAR lib[LIB_MAX][MAX_PATH]; /* files the user added */
 } Config;

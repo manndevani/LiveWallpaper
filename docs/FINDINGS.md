@@ -154,3 +154,13 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 - The CPU numbers above are software rendering (llvmpipe). They say nothing about cost on a real GPU, which is not measured yet. Video under llvmpipe is very expensive (mpv's shaders run on the CPU), and RSS was ~330 MB; `profile=fast` was added afterwards.
 - WSL quirk: commands passed through `wsl -- sh -c "…"` from PowerShell lose `$variables`. Put test steps in a script file and run `wsl -- bash file.sh`.
 - Ubuntu has no package with `wlr-layer-shell-unstable-v1.xml`; it was taken from gitlab.freedesktop.org/wlroots/wlr-protocols.
+
+## Screen saver (2026-11-20, same Windows 11 machine)
+
+- A screen saver is any exe Windows starts with `/s` (full screen), `/p <hwnd>` (draw inside the preview box of Screen Saver Settings) or `/c` (configure; also no arguments when the file is a `.scr`). Some callers write `/p:1234` or `/c:1234`, so both forms are parsed.
+- Windows only checks "Ask for password" (`ScreenSaverIsSecure`) as the screen saver ends: it locks the session and shows its own sign-in screen. The screen saver never needs to handle passwords.
+- `SPI_GETSCREENSAVEACTIVE` reports TRUE even with "(None)" chosen, so whether a screen saver is really on also needs `SCRNSAVE.EXE` from `HKCU\Control Panel\Desktop`.
+- Policy keys under `HKCU\Software\Policies\Microsoft\Windows\Control Panel\Desktop` override the user's choice. The settings window shows a note instead of switches when that key has values.
+- Like `scrnsave.lib`, the full-screen window closes when the app loses activation. Started by hand from a script while another window was taking focus, it sometimes closed at once; started from the settings window (Preview) it stays until real input.
+- With the same 5 s trim as the engine, the full-screen saver drops from 35.5 MB to 2.5 MB. Aurora at 1920×1080 used 62 ms of CPU over 5 s.
+- Testing tip: in PowerShell, `$null` passed to a `string` P/Invoke parameter becomes `""`, so `FindWindow("class", $null)` finds nothing. Declare the title as `IntPtr` and pass `[IntPtr]::Zero`.

@@ -13,6 +13,7 @@
 #include "ipc.h"
 #include "preview.h"
 #include "settings.h"
+#include "lock.h"
 #include <d2d1.h>
 #include <dwrite.h>
 #include <dwmapi.h>
@@ -20,12 +21,17 @@
 #include <shellapi.h>
 #include <wincodec.h>
 #include <windowsx.h>
+#include <roapi.h>
+#include <winstring.h>
+#include <windows.storage.h>
+#include <windows.system.userprofile.h>
 
 namespace {
 
 /* ---- layout (DIPs) ----------------------------------------------------- */
 
-const float W = 780, H = 500;
+const float W = 780, H = 540;
+const float TABS = 38;          /* Desktop / Lock screen switch above the inspector */
 const float FOOT = 30;          /* status bar height */
 const float SIDE = 252;         /* inspector width */
 const float LEFT_W = W - SIDE;  /* library pane width */
@@ -47,7 +53,14 @@ enum {
     ID_QUALITY = 70,  /* + index */
     ID_FIT = 80,      /* + index */
     ID_FOLDER = 90,
+    ID_TAB = 100,     /* + 0 desktop, 1 lock screen */
+    ID_LOCK_ON = 110, ID_LOCK_SAME, ID_LOCK_SECURE, ID_LOCK_PICTURE, ID_LOCK_PREVIEW,
+    ID_LOCK_WAIT = 120, /* + index */
 };
+
+const WCHAR *const kTabLabel[] = {L"Desktop", L"Lock screen"};
+const UINT kWait[] = {1, 5, 10, 15, 30}; /* minutes */
+const WCHAR *const kWaitLabel[] = {L"1", L"5", L"10", L"15", L"30"};
 
 const UINT kFps[] = {15, 30, 60};
 const WCHAR *const kFpsLabel[] = {L"15", L"30", L"60"};
@@ -59,6 +72,7 @@ const int FILTERS = 5;
 
 #define WM_APP_ADD (WM_APP + 1)
 #define WM_APP_THUMB (WM_APP + 2)
+#define WM_APP_LOCKTAB (WM_APP + 3)
 
 struct Hit {
     D2D1_RECT_F r;
@@ -102,6 +116,8 @@ struct State {
     DWORD last_input;    /* GetTickCount of the last mouse/keyboard input */
     Thumb thumbs[LIB_MAX + 16];
     int nthumbs;
+    int tab;             /* 0 desktop, 1 lock screen */
+    LockState lock;      /* Windows' screen saver settings */
 } s;
 
 /* Like the engine: most of what Direct2D and the driver hold is needed only
@@ -155,10 +171,13 @@ UINT item_count() { return g_builtin_count + cfg.lib_count; }
 const WCHAR *item_id(UINT i) { return i < g_builtin_count ? g_builtins[i].id : cfg.lib[i - g_builtin_count]; }
 bool item_interactive(UINT i) { return i < g_builtin_count && g_builtins[i].interactive; }
 
+/* The wallpaper the open tab is about. */
+const WCHAR *shown_id() { return s.tab == 1 && cfg.lock[0] ? cfg.lock : cfg.current; }
+
 int current_index()
 {
     for (UINT i = 0; i < item_count(); i++)
-        if (str_ieq(item_id(i), cfg.current))
+        if (str_ieq(item_id(i), shown_id()))
             return (int)i;
     return -1;
 }
@@ -665,16 +684,81 @@ void draw_grid()
     }
 }
 
+/* Wrapped text, top-aligned. */
+void para(const WCHAR *t, D2D1_RECT_F r, D2D1_COLOR_F c)
+{
+    IDWriteTextFormat *f = s.f_small;
+    f->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+    f->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+    text(t, r, f, c);
+    f->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+    f->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+}
+
+void draw_lock(float x, float y, float w)
+{
+    LockState &l = s.lock;
+    text(display_name(shown_id()), R(x, y, x + w, y + 24), s.f_title, s.th.text);
+    y += 26;
+    text(L"Click a wallpaper to choose it", R(x, y, x + w, y + 18), s.f_small, s.th.sub);
+    y += 26;
+    toggle(x, y, w, L"Same as desktop", cfg.lock[0] == 0, ID_LOCK_SAME);
+    y += 32;
+    line(x, y + 0.5f, x + w, y + 0.5f, s.th.line);
+    y += 10;
+
+    if (l.managed) {
+        para(L"Your organization controls the screen saver on this PC, so livewall can't turn it on.",
+             R(x, y, x + w, y + 60), s.th.sub);
+        return;
+    }
+    toggle(x, y, w, L"Show when idle", l.ours != 0, ID_LOCK_ON);
+    y += 30;
+    if (l.ours) {
+        text(L"start after", R(x, y, x + w, y + 18), s.f_mono, s.th.faint);
+        text(L"minutes", R(x, y, x + w, y + 18), s.f_mono, s.th.faint, DWRITE_TEXT_ALIGNMENT_TRAILING);
+        y += 20;
+        int sel = 4;
+        for (int i = 0; i < 5; i++)
+            if (l.minutes <= kWait[i]) {
+                sel = i;
+                break;
+            }
+        segmented(x, y, w, kWaitLabel, 5, sel, ID_LOCK_WAIT);
+        y += 36;
+        toggle(x, y, w, L"Ask for password", l.secure != 0, ID_LOCK_SECURE);
+        y += 26;
+    }
+    toggle(x, y, w, L"Same picture on lock screen", cfg.lock_picture != 0, ID_LOCK_PICTURE);
+    y += 34;
+    button(R(x, y, x + w, y + 30), L"\xE768", L"Preview", ID_LOCK_PREVIEW, false);
+    y += 42;
+    line(x, y + 0.5f, x + w, y + 0.5f, s.th.line);
+    y += 10;
+    const WCHAR *note = !l.ours && l.other ? L"Turning this on replaces your current screen saver."
+                        : l.ours && !l.secure
+                            ? L"Anyone can use the PC when it ends. Turn on \"Ask for password\" to lock it."
+                            : L"Windows checks your password, not livewall. When you come back, the normal Windows "
+                              L"sign-in screen asks for it.";
+    para(note, R(x, y, x + w, H - FOOT - 8), s.th.sub);
+}
+
 void draw_inspector()
 {
     float x0 = LEFT_W, x = LEFT_W + 16, w = SIDE - 32;
     fill(R(x0, 0, W, H - FOOT), s.th.panel, 0);
     line(x0 + 0.5f, 0, x0 + 0.5f, H - FOOT, s.th.line);
 
+    segmented(x, 14, w, kTabLabel, 2, s.tab, ID_TAB);
+    if (s.tab == 1) {
+        draw_lock(x, 14 + TABS, w);
+        return;
+    }
+
     int cur = current_index();
     EngineStatus st = s.engine.status;
     bool running = st != ST_NOT_RUNNING;
-    float y = 14;
+    float y = 14 + TABS;
 
     /* Status badge + type tag. */
     D2D1_COLOR_F dc = st == ST_RUNNING || st == ST_STILL ? rgb(0x3FB950)
@@ -890,6 +974,106 @@ void add_files()
     RELEASE(dlg);
 }
 
+/* ---- lock screen ------------------------------------------------------- */
+
+/* Waits for a WinRT async call, keeping the window painted. */
+bool wait_async(IUnknown *op)
+{
+    ABI::Windows::Foundation::IAsyncInfo *info = nullptr;
+    ABI::Windows::Foundation::AsyncStatus st = ABI::Windows::Foundation::AsyncStatus::Started;
+    if (FAILED(op->QueryInterface(IID_PPV_ARGS(&info))))
+        return false;
+    DWORD t0 = GetTickCount();
+    while (SUCCEEDED(info->get_Status(&st)) && st == ABI::Windows::Foundation::AsyncStatus::Started &&
+           GetTickCount() - t0 < 15000) {
+        MSG m;
+        while (PeekMessageW(&m, nullptr, WM_PAINT, WM_PAINT, PM_REMOVE))
+            DispatchMessageW(&m);
+        Sleep(15);
+    }
+    info->Release();
+    return st == ABI::Windows::Foundation::AsyncStatus::Completed;
+}
+
+template <typename T> HRESULT factory(const WCHAR *cls, T **out)
+{
+    HSTRING_HEADER h;
+    HSTRING name;
+    HRESULT hr = WindowsCreateStringReference(cls, (UINT32)str_len(cls), &h, &name);
+    return SUCCEEDED(hr) ? RoGetActivationFactory(name, __uuidof(T), (void **)out) : hr;
+}
+
+/* Hands a PNG to Windows as the lock screen picture. */
+bool set_lock_image(const WCHAR *png)
+{
+    using namespace ABI::Windows::Storage;
+    using namespace ABI::Windows::System::UserProfile;
+    IStorageFileStatics *files = nullptr;
+    ILockScreenStatics *lock = nullptr;
+    ABI::Windows::Foundation::IAsyncOperation<StorageFile *> *get = nullptr;
+    ABI::Windows::Foundation::IAsyncAction *set = nullptr;
+    IStorageFile *file = nullptr;
+    HSTRING_HEADER h;
+    HSTRING path;
+    bool ok = false;
+    if (SUCCEEDED(factory(RuntimeClass_Windows_Storage_StorageFile, &files)) &&
+        SUCCEEDED(factory(RuntimeClass_Windows_System_UserProfile_LockScreen, &lock)) &&
+        SUCCEEDED(WindowsCreateStringReference(png, (UINT32)str_len(png), &h, &path)) &&
+        SUCCEEDED(files->GetFileFromPathAsync(path, &get)) && wait_async(get) &&
+        SUCCEEDED(get->GetResults(&file)) && SUCCEEDED(lock->SetImageFileAsync(file, &set)))
+        ok = wait_async(set);
+    RELEASE(set);
+    RELEASE(file);
+    RELEASE(get);
+    RELEASE(lock);
+    RELEASE(files);
+    return ok;
+}
+
+/* Renders the lock screen wallpaper at the screen's size and makes it the
+   Windows lock screen picture, so the screen saver and the sign-in screen
+   look alike. */
+void update_lock_picture()
+{
+    UINT w = (UINT)GetSystemMetrics(SM_CXSCREEN), h = (UINT)GetSystemMetrics(SM_CYSCREEN);
+    if (w > 3840 || h > 2160) { /* plenty for a still picture */
+        h = h * 3840 / w;
+        w = 3840;
+    }
+    if (!w || !h)
+        return;
+    HCURSOR old = SetCursor(LoadCursorW(nullptr, MAKEINTRESOURCEW(32514) /* IDC_WAIT */));
+    WCHAR png[MAX_PATH];
+    app_dir(png);
+    str_cat(png, L"\\lockscreen.png", MAX_PATH);
+    BYTE *px = (BYTE *)mem_alloc((SIZE_T)w * h * 4);
+    bool ok = px && preview_begin() && preview_render(cfg.lock[0] ? cfg.lock : cfg.current, w, h, 8.0, px) &&
+              preview_save_png(png, w, h, px);
+    mem_free(px);
+    if (!s.thumb_posted)
+        preview_end();
+    if (ok)
+        ok = set_lock_image(png);
+    log_line(L"lock screen picture %s", ok ? L"set" : L"could not be set");
+    SetCursor(old);
+}
+
+void lock_changed()
+{
+    config_save(&cfg); /* the engine doesn't use these, so no reload */
+    if (cfg.lock_picture)
+        update_lock_picture();
+    invalidate();
+}
+
+void set_lock(BOOL on, UINT minutes, BOOL secure)
+{
+    if (!lock_apply(on, minutes, secure))
+        MessageBoxW(s.hwnd, L"Windows did not accept the screen saver setting.", L"livewall", MB_ICONWARNING);
+    lock_query(&s.lock);
+    invalidate();
+}
+
 void set_slider(int id, float px)
 {
     D2D1_RECT_F t = s.slider[id == ID_SPEED ? 0 : 1];
@@ -907,11 +1091,46 @@ void activate(int id)
         UINT i = (UINT)(id - ID_REMOVE);
         if (str_ieq(cfg.lib[i], cfg.current))
             str_copy(cfg.current, g_builtins[0].id, MAX_PATH);
+        if (str_ieq(cfg.lib[i], cfg.lock))
+            cfg.lock[0] = 0;
         lib_remove(&cfg, i);
         apply(false);
+    } else if (id >= ID_CARD && id < ID_CARD + (int)item_count() && s.tab == 1) {
+        str_copy(cfg.lock, item_id((UINT)(id - ID_CARD)), MAX_PATH);
+        lock_changed();
     } else if (id >= ID_CARD && id < ID_CARD + (int)item_count()) {
         str_copy(cfg.current, item_id((UINT)(id - ID_CARD)), MAX_PATH);
         apply(true);
+        if (!cfg.lock[0] && cfg.lock_picture)
+            update_lock_picture();
+    } else if (id >= ID_TAB && id < ID_TAB + 2) {
+        s.tab = id - ID_TAB;
+        lock_query(&s.lock);
+        invalidate();
+    } else if (id == ID_LOCK_SAME) {
+        if (cfg.lock[0])
+            cfg.lock[0] = 0;
+        else
+            str_copy(cfg.lock, cfg.current, MAX_PATH);
+        lock_changed();
+    } else if (id == ID_LOCK_ON) {
+        /* Ask for the password by default: a screen saver that unlocks the PC
+           for anyone would be a step back from the normal lock. */
+        set_lock(!s.lock.ours, s.lock.minutes, s.lock.ours ? s.lock.secure : TRUE);
+    } else if (id >= ID_LOCK_WAIT && id < ID_LOCK_WAIT + 5) {
+        set_lock(TRUE, kWait[id - ID_LOCK_WAIT], s.lock.secure);
+    } else if (id == ID_LOCK_SECURE) {
+        set_lock(TRUE, s.lock.minutes, !s.lock.secure);
+    } else if (id == ID_LOCK_PICTURE) {
+        cfg.lock_picture = !cfg.lock_picture;
+        config_save(&cfg);
+        if (cfg.lock_picture)
+            update_lock_picture();
+        invalidate();
+    } else if (id == ID_LOCK_PREVIEW) {
+        WCHAR exe[MAX_PATH];
+        if (GetModuleFileNameW(nullptr, exe, MAX_PATH))
+            ShellExecuteW(s.hwnd, L"open", exe, L"/s", nullptr, SW_SHOWNORMAL);
     } else if (id == ID_ADD) {
         add_files();
     } else if (id >= ID_FILTER && id < ID_FILTER + FILTERS) {
@@ -1009,6 +1228,7 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
             note_input();
             config_load(&cfg);
             refresh_engine();
+            lock_query(&s.lock);
             invalidate();
         } else if (LOWORD(w) == WA_INACTIVE && !s.thumb_posted) {
             trim_memory(); /* in the background: give it back right away */
@@ -1086,6 +1306,9 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_APP_THUMB:
         build_next_thumb();
         return 0;
+    case WM_APP_LOCKTAB:
+        activate(ID_TAB + 1);
+        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -1095,15 +1318,17 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 } // namespace
 
-extern "C" void settings_run(BOOL add)
+extern "C" void settings_run(int page)
 {
     HWND existing = FindWindowW(SETTINGS_CLASS, nullptr);
     if (existing) {
         if (IsIconic(existing))
             ShowWindow(existing, SW_RESTORE);
         SetForegroundWindow(existing);
-        if (add)
+        if (page == SETTINGS_ADD)
             PostMessageW(existing, WM_APP_ADD, 0, 0);
+        else if (page == SETTINGS_LOCK)
+            PostMessageW(existing, WM_APP_LOCKTAB, 0, 0);
         return;
     }
 
@@ -1112,6 +1337,8 @@ extern "C" void settings_run(BOOL add)
     config_load(&cfg);
     s.autostart = autostart_query() != FALSE;
     s.engine = engine_query();
+    lock_query(&s.lock);
+    s.tab = page == SETTINGS_LOCK ? 1 : 0;
 
     if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &s.d2d)) ||
         FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
@@ -1157,7 +1384,7 @@ extern "C" void settings_run(BOOL add)
     load_theme();
     SetTimer(s.hwnd, 1, 1000, nullptr);
     ShowWindow(s.hwnd, SW_SHOW);
-    if (add)
+    if (page == SETTINGS_ADD)
         PostMessageW(s.hwnd, WM_APP_ADD, 0, 0);
 
     MSG msg;

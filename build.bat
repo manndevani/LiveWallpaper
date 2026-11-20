@@ -28,6 +28,6 @@ cl /nologo /utf-8 /O1 /GS- /Gy /Zl /W4 /wd4201 /fp:fast /GR- /EHs-c- /Zc:threadS
    /link /NODEFAULTLIB /ENTRY:entry /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF ^
    kernel32.lib user32.lib gdi32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib uuid.lib ^
    dwmapi.lib wtsapi32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mfuuid.lib windowscodecs.lib ^
-   d2d1.lib dwrite.lib || exit /b 1
+   d2d1.lib dwrite.lib runtimeobject.lib || exit /b 1
 
 for %%f in (build\livewall.exe) do echo Built %%f (%%~zf bytes)

@@ -14,6 +14,7 @@
 #include "engine.h"
 #include "settings.h"
 #include "still.h"
+#include "lock.h"
 #include <shellapi.h>
 #include <wtsapi32.h>
 
@@ -625,7 +626,7 @@ void engine_run(BOOL quiet)
         if (mutex)
             CloseHandle(mutex);
         if (!quiet)
-            settings_run(FALSE);
+            settings_run(SETTINGS_MAIN);
         return;
     }
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -645,6 +646,7 @@ void engine_run(BOOL quiet)
         str_copy(cfg.autostart_exe, cmd, MAX_PATH + 16);
     if (first || !str_ieq(cfg.autostart_exe, cmd))
         config_save(&cfg);
+    lock_refresh(); /* the screen saver copy follows this exe after an update */
 
     QueryPerformanceFrequency(&f);
     e.qpf = f.QuadPart;

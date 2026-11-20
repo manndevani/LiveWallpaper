@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/manndevani/LiveWallpaper/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/manndevani/LiveWallpaper?label=download&style=for-the-badge"></a>
-  <img alt="Size" src="https://img.shields.io/badge/size-114%20KB-2a78d6?style=for-the-badge">
+  <img alt="Size" src="https://img.shields.io/badge/size-125%20KB-2a78d6?style=for-the-badge">
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2a78d6?style=for-the-badge">
   <img alt="Linux" src="https://img.shields.io/badge/Linux-Wayland%20%7C%20X11-2a78d6?style=for-the-badge">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a78d6?style=for-the-badge"></a>
@@ -21,7 +21,7 @@
 
 | The numbers | What they mean |
 |---|---|
-| 🪶 **114 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
+| 🪶 **125 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
 | 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
 | 💤 **0% GPU** | When a window covers the desktop, it stops completely and uses no graphics power. |
 | ⚡ **~0.1% CPU** | Barely touches your processor. The graphics card does the work. |
@@ -54,6 +54,14 @@ Five animated wallpapers come built in, and they repeat smoothly with no visible
 <p align="center"><img src="docs/images/settings.png" alt="livewall settings window" width="640"></p>
 
 Click a wallpaper to apply it. Adjust speed, brightness, frame rate, resolution and fit. It follows your light/dark theme and accent color.
+
+## Lock screen
+
+<p align="center"><img src="docs/images/lockscreen.png" alt="livewall settings, Lock screen tab: choose the wallpaper, show when idle, preview" width="640"></p>
+
+livewall can also show a live wallpaper when your PC sits idle, and it can be a different one from your desktop. Open the settings, switch to **Lock screen**, pick a wallpaper and turn on **Show when idle**.
+
+Your PC stays as safe as before. livewall never asks for or checks your password: it runs as a Windows screen saver, and with **Ask for password** on (the default), Windows locks the PC when it ends, so the normal Windows sign-in screen asks for your password. **Same picture on lock screen** makes that sign-in screen show a still picture of the same wallpaper.
 
 ## Download and run
 
@@ -126,6 +134,7 @@ The output is `build\livewall.exe`. Written in plain C on Direct3D 11, with no C
 | `livewall.exe -add` | Open settings and the file picker |
 | `livewall.exe -quit` | Stop the wallpaper |
 | `livewall.exe -snapshot <id or file> <out.png> [seconds]` | Render one frame to a PNG |
+| `livewall.exe /s` | Show the lock screen wallpaper full screen, as the screen saver does |
 
 </details>
 
@@ -135,13 +144,14 @@ The output is `build\livewall.exe`. Written in plain C on Direct3D 11, with no C
 - **Start with Windows** (on by default) adds a scheduled task named `livewall`.
 - Settings are stored in `%APPDATA%\livewall`.
 - Choosing a **still picture** sets it as your normal Windows wallpaper.
+- Only if you turn them on under **Lock screen**: **Show when idle** sets livewall as your Windows screen saver (a copy in `%LOCALAPPDATA%\livewall`), and **Same picture on lock screen** changes your Windows lock screen picture.
 
-Nothing else: no registry changes, no services, no drivers.
+Nothing else: no services, no drivers.
 
 **To uninstall:**
-1. Open the settings and turn off **Start with Windows**.
+1. Open the settings and turn off **Start with Windows**. On the **Lock screen** tab, turn off **Show when idle**.
 2. Right-click the tray icon → **Exit**.
-3. Delete `livewall.exe` and the `%APPDATA%\livewall` folder.
+3. Delete `livewall.exe` and the `%APPDATA%\livewall` and `%LOCALAPPDATA%\livewall` folders.
 
 If it still starts at sign-in, remove the task with:
 

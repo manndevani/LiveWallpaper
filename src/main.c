@@ -6,6 +6,7 @@
  *   livewall.exe -add            settings window, straight to "add files"
  *   livewall.exe -quit           stop the running engine
  *   livewall.exe -snapshot <id> <out.png> [seconds]   render one frame to a PNG
+ *   livewall.scr /s, /p <hwnd>, /c   the screen saver (see saver.c)
  *
  * Plain C, no C runtime: see util.c. */
 #include "common.h"
@@ -14,6 +15,7 @@
 #include "settings.h"
 #include "preview.h"
 #include "autostart.h"
+#include "lock.h"
 
 /* Copies the next (optionally quoted) argument into out; returns the rest. */
 static const WCHAR *next_arg(const WCHAR *s, WCHAR *out, int cap)
@@ -41,6 +43,21 @@ static BOOL is_flag(const WCHAR *arg, const WCHAR *name)
     if (*arg != '-' && *arg != '/')
         return FALSE;
     return str_ieq(arg + 1, name);
+}
+
+/* Screen saver arguments: /s, /p <hwnd>, /p:<hwnd>, /c, /c:<hwnd>. */
+static BOOL is_saver_flag(const WCHAR *arg)
+{
+    WCHAR c = arg[1] | 0x20;
+    return (arg[0] == '/' || arg[0] == '-') && (c == 's' || c == 'p' || c == 'c') && (arg[2] == 0 || arg[2] == ':');
+}
+
+/* Started as livewall.scr: Windows runs a screen saver with no arguments to
+   configure it. */
+static BOOL started_as_scr(void)
+{
+    WCHAR exe[MAX_PATH];
+    return GetModuleFileNameW(NULL, exe, MAX_PATH) && str_ieq(path_ext(exe), L".scr");
 }
 
 static double parse_seconds(const WCHAR *s)
@@ -73,14 +90,16 @@ void __stdcall entry(void)
     if (is_flag(arg, L"quit")) {
         engine_stop();
     } else if (is_flag(arg, L"settings")) {
-        settings_run(FALSE);
+        settings_run(SETTINGS_MAIN);
     } else if (is_flag(arg, L"add")) {
-        settings_run(TRUE);
+        settings_run(SETTINGS_ADD);
     } else if (is_flag(arg, L"snapshot")) {
         rest = next_arg(rest, id, MAX_PATH);
         rest = next_arg(rest, out, MAX_PATH);
         next_arg(rest, secs, 32);
         code = snapshot_run(id, out, secs[0] ? parse_seconds(secs) : 8.0);
+    } else if (is_saver_flag(arg) || (!arg[0] && started_as_scr())) {
+        code = saver_run(arg, rest);
     } else {
         engine_run(is_flag(arg, AUTOSTART_FLAG));
     }

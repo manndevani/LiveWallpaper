@@ -34,6 +34,16 @@ Last updated: 2026-11-20
 - [x] Animated preview in the README (`docs/images/preview.gif`, 2026-11-20): five built-ins at 2× speed, made from `-snapshot` frames. An MP4 version for posts is made the same way (not in the repo).
 - [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
 
+## Lock screen on Windows (screen saver, 2026-11-20)
+
+- [x] `livewall.exe /s` draws the lock wallpaper full screen over every monitor, animates (~1% of one core for Aurora), hides the cursor, and closes on a key press or mouse movement. Memory drops from 35 MB to 2.5 MB after 5 s.
+- [x] `/p <hwnd>` draws inside a host window and exits when the host closes (tested with a stand-in window, not yet in Windows' own dialog).
+- [x] Settings window: new Desktop / Lock screen switch. On the Lock screen tab, clicking a card sets `[lockscreen] wallpaper=` and leaves the desktop alone; *Same as desktop*; *Preview* runs `/s` with the chosen wallpaper (captured and clicked). `/c` opens settings on that tab.
+- [ ] **Not yet clicked: *Show when idle*, *start after*, *Ask for password*.** They change Windows' own screen saver and lock settings, so the user turns them on. Then check: the setting shows in Windows' Screen Saver Settings, the screen saver starts after the wait, and Windows asks for the password when it ends.
+- [ ] **Not yet clicked: *Same picture on lock screen*** (WinRT `LockScreen.SetImageFileAsync` from an unpackaged app). Turning it off does not bring the old picture back; the user picks one again in Windows Settings.
+- [ ] Battery (one still frame) and display-off pausing in the screen saver: written, not tested.
+- [ ] Multiple monitors in the screen saver: one window over the whole virtual screen, like the engine; untested.
+
 ## Linux (`linux/`, 2026-11-20): verified in WSL2 Ubuntu 26.04 without a GPU
 
 - [x] Builds with no warnings (~80 KB). The version comes from `src/version.h`.
@@ -87,6 +97,11 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 ## Ideas / next
 
 - Other platforms: Android and macOS next. They will reuse `shaders/glsl/`.
+- Lock screen on the other platforms, always through the system's own lock (never a home-made password screen):
+  - Linux: hyprlock / swaylock-plugin, or a screen saver plus the desktop's own locker;
+  - Android: a live wallpaper shows on the lock screen by itself;
+  - macOS: a `.saver` plus "Require password";
+  - iOS: export a video or Live Photo only.
 
 - Show shader compile errors in the settings inspector.
 - Per-monitor wallpapers (one swap chain per monitor).

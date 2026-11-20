@@ -10,6 +10,7 @@
 | `livewall.exe -add` | Settings window, opening the file picker | only while open |
 | `livewall.exe -quit` | Stops the engine and waits until it has exited | instant |
 | `livewall.exe -snapshot <id> <out.png> [sec]` | Renders one frame offscreen (testing) | instant |
+| `livewall.scr /s`, `/p <hwnd>`, `/c` | **Screen saver** (`saver.c`): full screen, the preview in Windows' dialog, or settings on the Lock screen tab | while the PC is idle |
 
 The UI lives in a separate process so the engine never pays for Direct2D, DirectWrite, the shell or thumbnails.
 Closing the settings window returns all of that memory. While it is open it hands back what it no longer touches (after 3 s without input, or when it goes to the background): ~3–4 MB instead of ~18.
@@ -50,6 +51,8 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 | `still.c/.h` | Hands still pictures to the Windows wallpaper (zero-cost mode) |
 | `preview.c/.h` | Offscreen rendering through the same sources: settings thumbnails and `-snapshot` |
 | `engine.c/.h` | Message loop, tray menu, scheduling, pause logic, recovery |
+| `lock.c/.h` | Turning livewall's screen saver on and off in Windows, keeping the `.scr` copy up to date |
+| `saver.c` | The screen saver window and its draw loop (same sources as the engine) |
 | `settings.cpp` | Custom-drawn settings window |
 | `shaders/` | HLSL. `fullscreen.hlsl` (VS), `blit` (textures + fit), `dim` (brightness), one file per built-in |
 
@@ -102,6 +105,18 @@ Logon tasks start before Explorer runs its staggered Run-key and Startup-folder 
 The task runs `livewall.exe -startup`. With `-startup` the engine never opens a window, not even on a first run, and a second copy started that way exits silently. Without it (the user opening the exe), a first run opens settings and a second copy opens settings too.
 
 The config stores the full task command (`autostart_exe`). If it differs from "<this exe> -startup" (the exe moved, or the task predates `-startup`), the next start re-registers the task.
+
+## Lock screen (screen saver, since 2026-11-20)
+
+livewall never draws its own lock screen and never checks passwords. It plugs into what Windows already has:
+
+- **Screen saver.** Turning on *Show when idle* copies the exe to `%LOCALAPPDATA%\livewall\livewall.scr` and sets `SCRNSAVE.EXE`, the timeout and `ScreenSaverIsSecure` ("Ask for password") in `HKCU\Control Panel\Desktop` through `SystemParametersInfo`. Windows starts it when the PC is idle. When it closes and *Ask for password* is on, Windows locks the PC and its own sign-in screen asks for the password. *Ask for password* is on by default.
+- **These settings live in Windows, not `config.ini`**, because Windows is what reads them. The settings window reads them back every time it is activated, so changes made in Windows' own Screen Saver Settings show up.
+- The `.scr` is a copy (Windows needs a fixed path). The engine refreshes it at start if it differs from the running exe (size or date), so updates reach it.
+- **Which wallpaper:** `[lockscreen] wallpaper=` in `config.ini`, empty for "same as desktop".
+- **Matching lock screen picture** (optional, `match_picture=1`): the settings window renders the lock wallpaper at screen size to `%APPDATA%\livewall\lockscreen.png` and hands it to `Windows.System.UserProfile.LockScreen.SetImageFileAsync` (WinRT ABI from C++, no C++/WinRT). So the screen saver and the sign-in screen behind it look alike.
+- The saver draws like the engine: the same sources, speed, brightness and frame cap; one still frame on battery when *Pause on battery* is on; no frames while the display is off. It trims its memory once after 5 s (35 MB to 2.5 MB). Any key, click, or mouse movement over 10 px ends it (movement in the first 0.6 s is ignored).
+- The engine needs nothing special: the saver's topmost full-screen window covers the desktop, so the engine pauses as it does for any full-screen app.
 
 ## Linux (`linux/`, since 2026-11-20)
 
