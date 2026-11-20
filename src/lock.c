@@ -2,6 +2,7 @@
  * See lock.h. The saver itself is in saver.c. */
 #include "common.h"
 #include "lock.h"
+#include <tlhelp32.h>
 
 #define DESKTOP_KEY L"Control Panel\\Desktop"
 #define POLICY_KEY L"Software\\Policies\\Microsoft\\Windows\\Control Panel\\Desktop"
@@ -171,17 +172,37 @@ static VOID CALLBACK saver_ended(PVOID process, BOOLEAN timed_out)
     CloseHandle((HANDLE)process);
 }
 
-/* Called every half second after lock_now, until it returns TRUE. Once the
-   screen saver's window exists, waits on its process (see saver_ended). If
-   it doesn't show up within 5 s, locks the normal way, so the shortcut
-   always ends locked. */
+/* The running livewall.scr started by Windows. Windows runs screen savers on
+   a desktop of their own, where FindWindow from ours can't see the window,
+   so look for the process instead. */
+static DWORD saver_pid(void)
+{
+    PROCESSENTRY32W pe;
+    DWORD pid = 0;
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    HWND w;
+    if (snap != INVALID_HANDLE_VALUE) {
+        pe.dwSize = sizeof pe;
+        if (Process32FirstW(snap, &pe))
+            do {
+                if (str_ieq(pe.szExeFile, L"livewall.scr"))
+                    pid = pe.th32ProcessID; /* normally there is only one */
+            } while (Process32NextW(snap, &pe));
+        CloseHandle(snap);
+    }
+    if (!pid && (w = FindWindowW(SAVER_CLASS, NULL)) != NULL) /* started some other way */
+        GetWindowThreadProcessId(w, &pid);
+    return pid;
+}
+
+/* Called every 100 ms after lock_now, until it returns TRUE. Once the
+   screen saver is running, waits on its process (see saver_ended). If it
+   doesn't show up within 5 s, locks the normal way, so the shortcut always
+   ends locked. */
 BOOL lock_check(UINT waited_ms)
 {
-    HWND w = FindWindowW(SAVER_CLASS, NULL);
-    DWORD pid = 0;
-    HANDLE p = NULL;
-    if (w && GetWindowThreadProcessId(w, &pid) && pid)
-        p = OpenProcess(SYNCHRONIZE, FALSE, pid);
+    DWORD pid = saver_pid();
+    HANDLE p = pid ? OpenProcess(SYNCHRONIZE, FALSE, pid) : NULL;
     if (p) {
         if (g_wait) { /* done, or pressed again while it shows: the new wait covers it */
             UnregisterWait(g_wait);

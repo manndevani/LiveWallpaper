@@ -594,12 +594,12 @@ static LRESULT CALLBACK msg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_HOTKEY:
         if (w == 1 && lock_now()) {
             e.lock_waited = 0;
-            SetTimer(h, 2, 500, NULL);
+            SetTimer(h, 2, 100, NULL);
         }
         return 0;
     case WM_TIMER:
         if (w == 2) {
-            e.lock_waited += 500;
+            e.lock_waited += 100;
             if (lock_check(e.lock_waited))
                 KillTimer(h, 2);
             return 0;

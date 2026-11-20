@@ -33,7 +33,7 @@ void lock_refresh(void);
 /* The lock shortcut (Ctrl+Alt+L): starts the screen saver now. If it is not
    livewall's, or "Ask for password" is off, locks the PC directly instead.
    Returns TRUE when it started the screen saver: then call lock_check()
-   every 500 ms until it returns TRUE. */
+   every 100 ms until it returns TRUE. */
 BOOL lock_now(void);
 BOOL lock_check(UINT waited_ms);
 #define SAVER_CLASS APP L"_saver" /* the screen saver's window */
