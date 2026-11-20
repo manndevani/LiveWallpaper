@@ -612,6 +612,8 @@ static LRESULT CALLBACK msg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_WTSSESSION_CHANGE:
         if (w == WTS_SESSION_LOCK) e.locked = TRUE;
         if (w == WTS_SESSION_UNLOCK) e.locked = FALSE;
+        if (w == WTS_SESSION_LOCK || w == WTS_SESSION_UNLOCK)
+            log_line(w == WTS_SESSION_LOCK ? L"PC locked" : L"PC unlocked");
         poll();
         return 0;
     case WM_POWERBROADCAST:

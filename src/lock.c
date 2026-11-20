@@ -137,7 +137,9 @@ void lock_refresh(void)
 
 /* The lock shortcut. Asks Windows to start the screen saver now, the same
    way it does after the idle time, so Windows itself watches it and locks
-   the PC when it ends. Without livewall's screen saver, it simply locks. */
+   the PC when it ends; lock_check() also locks it the moment the screen saver
+   closes, even inside Windows' grace period. Without livewall's screen saver,
+   it simply locks. */
 BOOL lock_now(void)
 {
     LockState s;
@@ -153,16 +155,46 @@ BOOL lock_now(void)
     return TRUE;
 }
 
-/* Called every half second after lock_now. The screen saver counts as
-   started once Windows reports it running or its window exists (Windows
-   doesn't always report it at once). If neither shows up within 5 s, lock
-   the normal way, so the shortcut always ends locked. Returns TRUE when done. */
+/* The thread-pool wait on the shortcut's screen saver. Only this (engine)
+   thread touches it: the previous one is released when the next is made. */
+static HANDLE g_wait;
+
+/* Runs on a thread-pool thread the moment the screen saver process ends.
+   Windows skips the password if a screen saver ends within its grace period
+   (ScreenSaverGracePeriod, 5 s by default). That suits an idle start, not a
+   lock shortcut, so lock here whatever Windows decided. Locking an already
+   locked PC does nothing. */
+static VOID CALLBACK saver_ended(PVOID process, BOOLEAN timed_out)
+{
+    (void)timed_out;
+    LockWorkStation(); /* no log here: log_line isn't thread-safe; the engine logs the lock */
+    CloseHandle((HANDLE)process);
+}
+
+/* Called every half second after lock_now, until it returns TRUE. Once the
+   screen saver's window exists, waits on its process (see saver_ended). If
+   it doesn't show up within 5 s, locks the normal way, so the shortcut
+   always ends locked. */
 BOOL lock_check(UINT waited_ms)
 {
-    BOOL running = FALSE;
-    SystemParametersInfoW(SPI_GETSCREENSAVERRUNNING, 0, &running, 0);
-    if (running || FindWindowW(SAVER_CLASS, NULL)) {
-        log_line(L"lock shortcut: screen saver showing within %u ms", waited_ms);
+    HWND w = FindWindowW(SAVER_CLASS, NULL);
+    DWORD pid = 0;
+    HANDLE p = NULL;
+    if (w && GetWindowThreadProcessId(w, &pid) && pid)
+        p = OpenProcess(SYNCHRONIZE, FALSE, pid);
+    if (p) {
+        if (g_wait) { /* done, or pressed again while it shows: the new wait covers it */
+            UnregisterWait(g_wait);
+            g_wait = NULL;
+        }
+        if (RegisterWaitForSingleObject(&g_wait, p, saver_ended, p, INFINITE, WT_EXECUTEONLYONCE)) {
+            log_line(L"lock shortcut: screen saver showing within %u ms", waited_ms);
+            return TRUE;
+        }
+        CloseHandle(p);
+        g_wait = NULL;
+        log_line(L"lock shortcut: can't watch the screen saver (%u), locking directly", GetLastError());
+        LockWorkStation();
         return TRUE;
     }
     if (waited_ms < 5000)
