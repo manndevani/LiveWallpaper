@@ -8,6 +8,36 @@
 
 static BOOL own_device;
 
+/* Fractional part, also for negative x. */
+static double frac(double x)
+{
+    double c = x - (double)(LONGLONG)x;
+    return c < 0 ? c + 1.0 : c;
+}
+
+/* Close to sin(2*pi*x), without the C runtime: two parabolas. */
+static float wave(double x)
+{
+    double p = frac(x);
+    return (float)(p < 0.5 ? 16.0 * p * (0.5 - p) : -16.0 * (p - 0.5) * (1.0 - p));
+}
+
+/* A pretend cursor for interactive wallpapers: it drifts around the middle
+   and clicks every 3 s, so a series of snapshots shows them moving. At the
+   thumbnail time (9 s) the last click was 0.6 s ago, in the centre. */
+static void fake_mouse(FrameInfo *f, UINT w, UINT h, double at)
+{
+    double t = at - 8.4;
+    double age = frac(t / 3.0) * 3.0;
+    double c = t - age;
+    f->mouse[0] = w * 0.5f + w * 0.25f * wave(t / 6.0);
+    f->mouse[1] = h * 0.5f + h * 0.15f * wave(t / 3.0);
+    f->click[0] = w * 0.5f + w * 0.25f * wave(c / 6.0);
+    f->click[1] = h * 0.5f + h * 0.15f * wave(c / 3.0);
+    f->click_age = (float)age;
+    f->mouse_on = 1.0f;
+}
+
 BOOL preview_begin(void)
 {
     if (gfx.dev)
@@ -66,10 +96,7 @@ BOOL preview_render(const WCHAR *id, UINT w, UINT h, double at, BYTE *bgra)
     memset(&f, 0, sizeof f);
     f.time = at;
     f.phase = phase_at(at);
-    f.mouse[0] = f.click[0] = w * 0.5f;
-    f.mouse[1] = f.click[1] = h * 0.5f;
-    f.mouse_on = 1.0f;
-    f.click_age = 0.6f; /* so interactive previews show something */
+    fake_mouse(&f, w, h, at);
 
     s = source_for(kind_of(id));
     if (kind_of(id) != KIND_UNKNOWN && s->open(id, &info)) {

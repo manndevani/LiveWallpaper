@@ -31,6 +31,7 @@ Last updated: 2026-11-20
   - Auto renders 1:1 on this 1920×1080 screen, measured at ~100 ms/s GPU vs ~27 at half.
   - The settings switch saves `resolution=` and removes the old `scale=` key; both directions were clicked and checked.
   - Released in v0.1.1.
+- [x] Animated preview in the README (`docs/images/preview.gif`, 2026-11-20): five built-ins at 2× speed, made from `-snapshot` frames. An MP4 version for posts is made the same way (not in the repo).
 - [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
 
 ## Releasing

@@ -143,3 +143,4 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 - Dark tray menus: uxtheme ordinals 135 (`SetPreferredAppMode(AllowDark)`) and 136 (`FlushMenuThemes`). Undocumented but widely used.
 - `config.ini` is created with a UTF-16 BOM so that `WritePrivateProfileStringW` stores Unicode paths correctly.
 - Other processes (indexer or antivirus) briefly lock `config.ini` now and then. Writers outside the app must retry.
+- Animated README preview (2026-11-20): `-snapshot` now moves a pretend cursor over time (it clicks every 3 s), so frame series of Ripples and Glow Grid show them reacting. WIC's own GIF palette (`IWICPalette::InitializeFromBitmap`) bands these dark gradients badly without dithering, and error diffusion makes the GIF ~2× bigger. A median-cut palette per frame plus a 4×4 ordered dither looked smooth: 480×270, 10 fps, 134 frames = 4.9 MB.

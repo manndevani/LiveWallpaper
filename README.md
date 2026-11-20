@@ -12,7 +12,7 @@
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a78d6?style=for-the-badge"></a>
 </p>
 
-<p align="center"><img src="docs/images/aurora.jpg" alt="Aurora live wallpaper on Windows 11" width="820"></p>
+<p align="center"><img src="docs/images/preview.gif" alt="livewall's five built-in live wallpapers playing: Aurora, Dunes, Night Sky, Ripples and Glow Grid" width="820"><br><sub>The five built-in wallpapers, shown at 2× speed.</sub></p>
 
 ## Why livewall
 
