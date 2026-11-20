@@ -55,6 +55,7 @@ BOOL config_load(Config *c)
     GetPrivateProfileStringW(L"lockscreen", L"wallpaper", L"", c->lock, MAX_PATH, path);
     c->lock_picture = get_uint(path, L"lockscreen", L"match_picture", 0, 0, 1);
     c->lock_hotkey = get_uint(path, L"lockscreen", L"shortcut", 1, 0, 1);
+    GetPrivateProfileStringW(L"lockscreen", L"grace_before", L"", c->grace_before, 16, path);
 
     n = get_uint(path, L"library", L"count", 0, 0, LIB_MAX);
     c->lib_count = 0;
@@ -100,6 +101,7 @@ void config_save(const Config *c)
     WritePrivateProfileStringW(L"lockscreen", L"wallpaper", c->lock, path);
     put_uint(path, L"lockscreen", L"match_picture", c->lock_picture ? 1 : 0);
     put_uint(path, L"lockscreen", L"shortcut", c->lock_hotkey ? 1 : 0);
+    WritePrivateProfileStringW(L"lockscreen", L"grace_before", c->grace_before[0] ? c->grace_before : NULL, path);
 
     WritePrivateProfileStringW(L"library", NULL, NULL, path); /* rewrite the whole section */
     put_uint(path, L"library", L"count", c->lib_count);

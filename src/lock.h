@@ -37,6 +37,12 @@ void lock_refresh(void);
 BOOL lock_now(void);
 BOOL lock_check(UINT waited_ms);
 void lock_note_locked(void); /* the engine calls it on every WTS_SESSION_LOCK */
+/* Windows' screen saver grace period in ms (5000 when not set). Changing it
+   needs admin rights: the settings window runs reg.exe elevated. */
+DWORD lock_grace_ms(void);
+int lock_grace_raw(void); /* the value in seconds, or -1 when not set */
+#define GRACE_KEY L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
+#define GRACE_VALUE L"ScreenSaverGracePeriod"
 #define SAVER_CLASS APP L"_saver" /* the screen saver's window */
 #define LOCK_EVENT L"Local\\livewall_lock_shortcut" /* set: the screen saver came from the shortcut */
 #define LOCK_HOTKEY_MODS (MOD_CONTROL | MOD_ALT)

@@ -36,24 +36,6 @@ static struct {
     double anim;
 } v;
 
-/* Windows' grace period: a password-protected screen saver that ends sooner
-   than this after starting returns to the desktop without a password.
-   ScreenSaverGracePeriod (seconds, string or number), 5 when not set. */
-static DWORD grace_ms(void)
-{
-    WCHAR s[16];
-    DWORD n = 0, size = sizeof s, type = 0;
-    if (RegGetValueW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
-                     L"ScreenSaverGracePeriod", RRF_RT_REG_SZ | RRF_RT_REG_DWORD, &type, s, &size) != ERROR_SUCCESS)
-        return 5000;
-    if (type == REG_DWORD)
-        n = *(DWORD *)s;
-    else
-        for (WCHAR *p = s; *p >= '0' && *p <= '9'; p++)
-            n = n * 10 + (DWORD)(*p - '0');
-    return n * 1000;
-}
-
 /* Ends the screen saver. When the PC asks for a password, Windows locks it
    as this process ends: it switches from the screen saver's own locked
    desktop straight to the lock screen, so the desktop never shows. livewall
@@ -66,7 +48,7 @@ static void finish(void)
     if (v.preview || v.closing)
         return;
     elapsed = GetTickCount() - v.started;
-    grace = v.shortcut ? grace_ms() : 0;
+    grace = v.shortcut ? lock_grace_ms() : 0;
     if (grace && elapsed < grace + 500) { /* 500 ms: Windows starts counting before we run */
         v.closing = TRUE;
         SetTimer(v.wnd, 1, grace + 500 - elapsed, NULL);

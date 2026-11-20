@@ -548,6 +548,12 @@ static void tray_menu(void)
     } else if (cmd == CMD_SETTINGS) {
         spawn_self(L"-settings");
     } else if (cmd == CMD_EXIT) {
+        /* Put back Windows' grace period if the settings window set it to 0
+           ("Ask for PIN right away"). Re-read: the engine doesn't reload for
+           lock screen settings. A separate process asks for admin rights. */
+        config_load(&cfg);
+        if (cfg.grace_before[0])
+            spawn_self(L"-" GRACE_RESTORE_FLAG);
         DestroyWindow(e.msg);
     }
 }

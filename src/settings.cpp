@@ -54,7 +54,7 @@ enum {
     ID_FIT = 80,      /* + index */
     ID_FOLDER = 90,
     ID_TAB = 100,     /* + 0 desktop, 1 lock screen */
-    ID_LOCK_ON = 110, ID_LOCK_SAME, ID_LOCK_SECURE, ID_LOCK_PICTURE, ID_LOCK_PREVIEW, ID_LOCK_HOTKEY,
+    ID_LOCK_ON = 110, ID_LOCK_SAME, ID_LOCK_SECURE, ID_LOCK_PICTURE, ID_LOCK_PREVIEW, ID_LOCK_HOTKEY, ID_LOCK_GRACE,
     ID_LOCK_WAIT = 120, /* + index */
 };
 
@@ -118,6 +118,7 @@ struct State {
     int nthumbs;
     int tab;             /* 0 desktop, 1 lock screen */
     LockState lock;      /* Windows' screen saver settings */
+    bool grace_zero;     /* Windows asks for the password with no 5 s grace period */
 } s;
 
 /* Like the engine: most of what Direct2D and the driver hold is needed only
@@ -170,6 +171,12 @@ float clampf(float x, float a, float b) { return x < a ? a : x > b ? b : x; }
 UINT item_count() { return g_builtin_count + cfg.lib_count; }
 const WCHAR *item_id(UINT i) { return i < g_builtin_count ? g_builtins[i].id : cfg.lib[i - g_builtin_count]; }
 bool item_interactive(UINT i) { return i < g_builtin_count && g_builtins[i].interactive; }
+
+void refresh_lock()
+{
+    lock_query(&s.lock);
+    s.grace_zero = lock_grace_ms() == 0;
+}
 
 /* The wallpaper the open tab is about. */
 const WCHAR *shown_id() { return s.tab == 1 && cfg.lock[0] ? cfg.lock : cfg.current; }
@@ -728,6 +735,10 @@ void draw_lock(float x, float y, float w)
         y += 36;
         toggle(x, y, w, L"Ask for password", l.secure != 0, ID_LOCK_SECURE);
         y += 26;
+        if (l.secure) {
+            toggle(x, y, w, L"Ask for PIN right away", s.grace_zero, ID_LOCK_GRACE);
+            y += 26;
+        }
         toggle(x, y, w, L"Ctrl+Alt+L shows it and locks", cfg.lock_hotkey != 0, ID_LOCK_HOTKEY);
         y += 26;
     }
@@ -744,9 +755,21 @@ void draw_lock(float x, float y, float w)
                               L"wallpaper. Until then, it just locks the PC."
                         : l.ours && !l.secure
                             ? L"Anyone can use the PC when it ends. Turn on \"Ask for password\" to lock it."
+                        : l.ours && !s.grace_zero ? nullptr /* the warning below */
+                        : s.grace_zero && cfg.grace_before[0]
+                            ? L"Windows checks your password, not livewall. Exiting livewall from the tray puts "
+                              L"Windows' usual wait back."
                             : L"Windows checks your password, not livewall. When you come back, the normal Windows "
                               L"sign-in screen asks for it.";
-    para(note, R(x, y, x + w, H - FOOT - 8), s.th.sub);
+    if (note) {
+        para(note, R(x, y, x + w, H - FOOT - 8), s.th.sub);
+        return;
+    }
+    static WCHAR warn[200];
+    DWORD secs = lock_grace_ms() / 1000;
+    wsprintfW(warn, L"For the first %u second%s, a click or key press goes back to the desktop with no PIN. "
+                    L"Turn on \"Ask for PIN right away\" to stop that.", secs, secs == 1 ? L"" : L"s");
+    para(warn, R(x, y, x + w, H - FOOT - 8), s.th.accent);
 }
 
 void draw_inspector()
@@ -1072,12 +1095,85 @@ void lock_changed()
     invalidate();
 }
 
+void grace_put_back();
+
 void set_lock(BOOL on, UINT minutes, BOOL secure)
 {
     if (!lock_apply(on, minutes, secure))
         MessageBoxW(s.hwnd, L"Windows did not accept the screen saver setting.", L"livewall", MB_ICONWARNING);
-    lock_query(&s.lock);
+    if (!on || !secure)
+        grace_put_back(); /* "Ask for PIN right away" only matters with both on */
+    refresh_lock();
     invalidate();
+}
+
+/* "Ask for PIN right away": Windows' screen saver grace period, 0 or back to
+   Windows' default (the value removed). It is a machine-wide setting, so
+   Windows asks for admin rights (UAC) and reg.exe makes the change; livewall
+   itself never runs elevated. Cancelling the prompt changes nothing. */
+/* Sets the grace period to `secs` (digits), or removes it ("-" or empty:
+   Windows' default). Returns true if the value is now as asked. */
+bool grace_write(HWND owner, const WCHAR *secs)
+{
+    static WCHAR args[300];
+    bool remove = !secs[0] || secs[0] == '-';
+    if (remove)
+        wsprintfW(args, L"delete \"HKLM\\%s\" /v %s /f", GRACE_KEY, GRACE_VALUE);
+    else
+        wsprintfW(args, L"add \"HKLM\\%s\" /v %s /t REG_SZ /d %s /f", GRACE_KEY, GRACE_VALUE, secs);
+    SHELLEXECUTEINFOW ex;
+    memset(&ex, 0, sizeof ex);
+    ex.cbSize = sizeof ex;
+    ex.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+    ex.hwnd = owner;
+    ex.lpVerb = L"runas";
+    ex.lpFile = L"reg.exe";
+    ex.lpParameters = args;
+    ex.nShow = SW_HIDE;
+    if (ShellExecuteExW(&ex) && ex.hProcess) {
+        WaitForSingleObject(ex.hProcess, 10000);
+        CloseHandle(ex.hProcess);
+    }
+    int want = 0, now = lock_grace_raw();
+    for (const WCHAR *p = secs; *p >= '0' && *p <= '9'; p++)
+        want = want * 10 + (*p - '0');
+    bool ok = remove ? now < 0 : now == want;
+    log_line(L"grace period %s %s: now %d s", remove ? L"removed" : L"set to", remove ? L"" : secs, now);
+    return ok;
+}
+
+/* The switch. Turning it on remembers what Windows had, so turning it off
+   (or exiting livewall, see grace_restore_run) puts that back. */
+void set_grace(bool zero)
+{
+    if (zero) {
+        if (!cfg.grace_before[0]) {
+            int was = lock_grace_raw();
+            if (was < 0)
+                str_copy(cfg.grace_before, L"-", 16);
+            else
+                wsprintfW(cfg.grace_before, L"%d", was);
+        }
+        if (grace_write(s.hwnd, L"0"))
+            config_save(&cfg);
+        else
+            cfg.grace_before[0] = 0;
+    } else if (grace_write(s.hwnd, cfg.grace_before[0] ? cfg.grace_before : L"-")) {
+        cfg.grace_before[0] = 0;
+        config_save(&cfg);
+    }
+    refresh_lock();
+    invalidate();
+}
+
+/* Puts Windows' grace period back if livewall changed it: when the screen
+   saver or its password is turned off here. */
+void grace_put_back()
+{
+    if (cfg.grace_before[0] && grace_write(s.hwnd, cfg.grace_before)) {
+        cfg.grace_before[0] = 0;
+        config_save(&cfg);
+    }
 }
 
 void set_slider(int id, float px)
@@ -1111,7 +1207,7 @@ void activate(int id)
             update_lock_picture();
     } else if (id >= ID_TAB && id < ID_TAB + 2) {
         s.tab = id - ID_TAB;
-        lock_query(&s.lock);
+        refresh_lock();
         invalidate();
     } else if (id == ID_LOCK_SAME) {
         if (cfg.lock[0])
@@ -1127,6 +1223,8 @@ void activate(int id)
         set_lock(TRUE, kWait[id - ID_LOCK_WAIT], s.lock.secure);
     } else if (id == ID_LOCK_SECURE) {
         set_lock(TRUE, s.lock.minutes, !s.lock.secure);
+    } else if (id == ID_LOCK_GRACE) {
+        set_grace(!s.grace_zero);
     } else if (id == ID_LOCK_HOTKEY) {
         cfg.lock_hotkey = !cfg.lock_hotkey;
         apply(false); /* the engine owns the shortcut */
@@ -1237,7 +1335,7 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
             note_input();
             config_load(&cfg);
             refresh_engine();
-            lock_query(&s.lock);
+            refresh_lock();
             invalidate();
         } else if (LOWORD(w) == WA_INACTIVE && !s.thumb_posted) {
             trim_memory(); /* in the background: give it back right away */
@@ -1327,6 +1425,21 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 } // namespace
 
+/* livewall.exe -put-back-grace: started by the engine on Exit from the tray.
+   If livewall set Windows' grace period to 0, puts the old value back
+   (Windows asks for admin rights). If that is cancelled, config.ini keeps
+   the old value, so the next Exit or the switch can still put it back. */
+extern "C" void grace_restore_run(void)
+{
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    config_load(&cfg);
+    if (cfg.grace_before[0] && grace_write(nullptr, cfg.grace_before)) {
+        cfg.grace_before[0] = 0;
+        config_save(&cfg);
+    }
+    CoUninitialize();
+}
+
 extern "C" void settings_run(int page)
 {
     HWND existing = FindWindowW(SETTINGS_CLASS, nullptr);
@@ -1346,7 +1459,7 @@ extern "C" void settings_run(int page)
     config_load(&cfg);
     s.autostart = autostart_query() != FALSE;
     s.engine = engine_query();
-    lock_query(&s.lock);
+    refresh_lock();
     s.tab = page == SETTINGS_LOCK ? 1 : 0;
 
     if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &s.d2d)) ||

@@ -5,6 +5,7 @@
  *   livewall.exe -settings       the settings window (separate, short-lived)
  *   livewall.exe -add            settings window, straight to "add files"
  *   livewall.exe -quit           stop the running engine
+ *   livewall.exe -put-back-grace put back Windows' grace period (engine, on Exit)
  *   livewall.exe -snapshot <id> <out.png> [seconds]   render one frame to a PNG
  *   livewall.scr /s, /p <hwnd>, /c   the screen saver (see saver.c)
  *
@@ -93,6 +94,8 @@ void __stdcall entry(void)
         settings_run(SETTINGS_MAIN);
     } else if (is_flag(arg, L"add")) {
         settings_run(SETTINGS_ADD);
+    } else if (is_flag(arg, GRACE_RESTORE_FLAG)) {
+        grace_restore_run();
     } else if (is_flag(arg, L"snapshot")) {
         rest = next_arg(rest, id, MAX_PATH);
         rest = next_arg(rest, out, MAX_PATH);

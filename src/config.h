@@ -33,6 +33,8 @@ typedef struct {
     WCHAR lock[MAX_PATH];    /* lock screen wallpaper; empty = same as the desktop */
     BOOL lock_picture;       /* also set the Windows lock screen picture to match */
     BOOL lock_hotkey;        /* Ctrl+Alt+L starts the screen saver (and so the lock) */
+    WCHAR grace_before[16];  /* Windows' grace period before livewall set it to 0, put back on
+                                Exit. "" = livewall didn't change it, "-" = it was not set */
     UINT lib_count;
     WCHAR lib[LIB_MAX][MAX_PATH]; /* files the user added */
 } Config;

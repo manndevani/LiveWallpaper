@@ -242,3 +242,27 @@ BOOL lock_check(UINT waited_ms)
     LockWorkStation();
     return TRUE;
 }
+
+/* Windows' grace period: a password-protected screen saver that ends sooner
+   than this after starting returns to the desktop without a password.
+   HKLM ScreenSaverGracePeriod (seconds, string or number), 5 when not set. */
+int lock_grace_raw(void)
+{
+    WCHAR s[16];
+    DWORD n = 0, size = sizeof s, type = 0;
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, GRACE_KEY, GRACE_VALUE, RRF_RT_REG_SZ | RRF_RT_REG_DWORD, &type, s,
+                     &size) != ERROR_SUCCESS)
+        return -1;
+    if (type == REG_DWORD)
+        n = *(DWORD *)s;
+    else
+        for (WCHAR *p = s; *p >= '0' && *p <= '9'; p++)
+            n = n * 10 + (DWORD)(*p - '0');
+    return (int)n;
+}
+
+DWORD lock_grace_ms(void)
+{
+    int n = lock_grace_raw();
+    return n < 0 ? 5000 : (DWORD)n * 1000;
+}

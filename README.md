@@ -65,6 +65,8 @@ Your PC stays as safe as before. livewall never asks for or checks your password
 
 **Lock with your wallpaper:** press **Ctrl+Alt+L** when you step away. Your live wallpaper plays right away, and when you come back and click, Windows asks for your PIN or password. (Windows+L belongs to Windows and keeps working as usual.)
 
+**Ask for PIN right away:** for its first 5 seconds, Windows lets anyone back in from a screen saver with no PIN. The Lock screen tab warns about this, and the **Ask for PIN right away** switch turns it off (Windows asks for admin rights). livewall remembers what Windows had, and puts it back when you turn the switch off, turn off *Show when idle* or *Ask for password*, or choose **Exit** from the tray icon.
+
 To go straight to the PIN box, without the Windows clock screen in between (Windows Pro): open `gpedit.msc` → Computer Configuration → Administrative Templates → Control Panel → Personalization → turn on **Do not display the lock screen**.
 
 ## Download and run
