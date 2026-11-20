@@ -16,7 +16,7 @@
 
 ## Why livewall
 
-| | |
+| The numbers | What they mean |
 |---|---|
 | 🪶 **94 KB** | The whole app is one small `.exe`. No installer, no runtime, no account. |
 | 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
@@ -31,11 +31,20 @@
 
 Five animated wallpapers come built in, and they loop seamlessly. *Ripples* and *Glow Grid* react to your mouse.
 
-| | |
-|---|---|
-| <img src="docs/images/aurora.jpg" alt="Aurora animated wallpaper" width="400"><br>**Aurora** | <img src="docs/images/dunes.jpg" alt="Dunes animated wallpaper" width="400"><br>**Dunes** |
-| <img src="docs/images/nightsky.jpg" alt="Night Sky animated wallpaper" width="400"><br>**Night Sky** | <img src="docs/images/ripples.jpg" alt="Ripples interactive wallpaper" width="400"><br>**Ripples** (interactive) |
-| <img src="docs/images/glowgrid.jpg" alt="Glow Grid interactive wallpaper" width="400"><br>**Glow Grid** (interactive) | **Add your own**<br>🎬 Video wallpapers: mp4, mov, mkv, webm, wmv, avi<br>🖼️ GIF and picture wallpapers: gif, png, jpg, webp…<br>✨ Shader wallpapers: write your own in HLSL ([guide](docs/CUSTOM_SHADERS.md)) |
+<table>
+  <tr>
+    <td><img src="docs/images/aurora.jpg" alt="Aurora animated wallpaper" width="400"><br><b>Aurora</b></td>
+    <td><img src="docs/images/dunes.jpg" alt="Dunes animated wallpaper" width="400"><br><b>Dunes</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/nightsky.jpg" alt="Night Sky animated wallpaper" width="400"><br><b>Night Sky</b></td>
+    <td><img src="docs/images/ripples.jpg" alt="Ripples interactive wallpaper" width="400"><br><b>Ripples</b> (interactive)</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/glowgrid.jpg" alt="Glow Grid interactive wallpaper" width="400"><br><b>Glow Grid</b> (interactive)</td>
+    <td><b>Add your own</b><br>🎬 Video wallpapers: mp4, mov, mkv, webm, wmv, avi<br>🖼️ GIF and picture wallpapers: gif, png, jpg, webp…<br>✨ Shader wallpapers: write your own in HLSL (<a href="docs/CUSTOM_SHADERS.md">guide</a>)</td>
+  </tr>
+</table>
 
 ## Settings
 
