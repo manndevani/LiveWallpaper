@@ -36,8 +36,20 @@ static struct {
 
 static void finish(void)
 {
-    if (!v.preview)
-        PostMessageW(v.wnd, WM_CLOSE, 0, 0);
+    HANDLE ev;
+    if (v.preview)
+        return;
+    /* Started by the lock shortcut: lock right now, before shutting down, so
+       the PIN screen comes at once (the engine also locks once we exit). */
+    ev = OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, FALSE, LOCK_EVENT);
+    if (ev) {
+        if (WaitForSingleObject(ev, 0) == WAIT_OBJECT_0) {
+            ResetEvent(ev);
+            LockWorkStation();
+        }
+        CloseHandle(ev);
+    }
+    PostMessageW(v.wnd, WM_CLOSE, 0, 0);
 }
 
 static LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)

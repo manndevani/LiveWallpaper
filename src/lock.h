@@ -37,6 +37,7 @@ void lock_refresh(void);
 BOOL lock_now(void);
 BOOL lock_check(UINT waited_ms);
 #define SAVER_CLASS APP L"_saver" /* the screen saver's window */
+#define LOCK_EVENT L"Local\\livewall_lock_shortcut" /* set: the screen saver came from the shortcut */
 #define LOCK_HOTKEY_MODS (MOD_CONTROL | MOD_ALT)
 #define LOCK_HOTKEY_KEY 'L'
 

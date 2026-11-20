@@ -141,6 +141,8 @@ void lock_refresh(void)
    the PC when it ends; lock_check() also locks it the moment the screen saver
    closes, even inside Windows' grace period. Without livewall's screen saver,
    it simply locks. */
+static HANDLE g_shortcut; /* LOCK_EVENT */
+
 BOOL lock_now(void)
 {
     LockState s;
@@ -151,6 +153,12 @@ BOOL lock_now(void)
         LockWorkStation();
         return FALSE; /* nothing to check afterwards */
     }
+    /* Tells the screen saver it was started by the shortcut (see finish() in
+       saver.c). Kept open so the event lives as long as the engine. */
+    if (!g_shortcut)
+        g_shortcut = CreateEventW(NULL, TRUE, FALSE, LOCK_EVENT);
+    if (g_shortcut)
+        SetEvent(g_shortcut);
     SendMessageTimeoutW(GetDesktopWindow(), WM_SYSCOMMAND, SC_SCREENSAVE, 0, SMTO_ABORTIFHUNG, 1000, &r);
     log_line(L"lock shortcut: screen saver started");
     return TRUE;
@@ -221,6 +229,8 @@ BOOL lock_check(UINT waited_ms)
     if (waited_ms < 5000)
         return FALSE;
     log_line(L"lock shortcut: screen saver did not start, locking directly");
+    if (g_shortcut)
+        ResetEvent(g_shortcut);
     LockWorkStation();
     return TRUE;
 }
