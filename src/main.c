@@ -1,6 +1,7 @@
 /* main.c - livewall entry point. One small executable, three roles:
  *
  *   livewall.exe                 the wallpaper engine (tray icon, always running)
+ *   livewall.exe -startup        the engine, started at sign-in: never opens a window
  *   livewall.exe -settings       the settings window (separate, short-lived)
  *   livewall.exe -add            settings window, straight to "add files"
  *   livewall.exe -quit           stop the running engine
@@ -12,6 +13,7 @@
 #include "engine.h"
 #include "settings.h"
 #include "preview.h"
+#include "autostart.h"
 
 /* Copies the next (optionally quoted) argument into out; returns the rest. */
 static const WCHAR *next_arg(const WCHAR *s, WCHAR *out, int cap)
@@ -80,7 +82,7 @@ void __stdcall entry(void)
         next_arg(rest, secs, 32);
         code = snapshot_run(id, out, secs[0] ? parse_seconds(secs) : 8.0);
     } else {
-        engine_run();
+        engine_run(is_flag(arg, AUTOSTART_FLAG));
     }
     ExitProcess((UINT)code);
 }

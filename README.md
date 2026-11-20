@@ -56,7 +56,7 @@ Click a wallpaper to apply it. Adjust speed, brightness, frame rate, resolution 
 
 1. Download the zip from **[Releases](https://github.com/manndevani/LiveWallpaper/releases/latest)**.
 2. Unzip it and run `livewall.exe`.
-3. Pick a wallpaper. Done. It starts with Windows from now on.
+3. Pick a wallpaper. From now on it starts with Windows by itself, quietly, with no window: just a small icon next to the clock.
 
 > Windows may say "Windows protected your PC", because the app isn't code-signed yet. Click **More info → Run anyway**.
 
@@ -118,6 +118,7 @@ The output is `build\livewall.exe`. Written in plain C on Direct3D 11, with no C
 | Command | Effect |
 |---|---|
 | `livewall.exe` | Start the wallpaper (or open settings if it's already running) |
+| `livewall.exe -startup` | Start the wallpaper with no window (used when Windows starts) |
 | `livewall.exe -settings` | Open the settings window |
 | `livewall.exe -add` | Open settings and the file picker |
 | `livewall.exe -quit` | Stop the wallpaper |

@@ -124,7 +124,7 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 
 - When livewall is launched from inside a packaged (MSIX) app, such as a terminal hosted by a Store-packaged app, Windows redirects its `%APPDATA%` writes to `%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\`. That folder is invisible to Explorer and to the same exe launched normally.
 - Result: `IDesktopWallpaper::SetWallpaper` on a file in our AppData fails with `0x80070002` (file not found). `still.c` retries with a copy in `%TEMP%`, which is not redirected.
-- It also means the config used during development sessions is not the one the sign-in task will read. The first real sign-in may behave like a first run.
+- It also means the config used during development sessions is not the one the sign-in task will read. Confirmed 2026-11-20: after a reboot the real `%APPDATA%ivewall` had no config yet, so the sign-in start acted as a first run and opened the settings window. Since then the task runs `livewall.exe -startup`, which never opens a window.
 
 - "GPU time" is the sum of `\GPU Engine(pid_*)\Running Time` across all engines. For video that includes the decode and video-processor engines.
 - Shader cost is almost the same whichever shader is used. Present and composition dominate, not the pixel shader.

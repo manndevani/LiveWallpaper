@@ -521,7 +521,7 @@ static void tray_menu(void)
         if (autostart_apply(on)) {
             cfg.autostart = on;
             if (on)
-                GetModuleFileNameW(NULL, cfg.autostart_exe, MAX_PATH);
+                autostart_command(cfg.autostart_exe);
             config_save(&cfg);
         }
     } else if (cmd == CMD_ADD) {
@@ -605,12 +605,13 @@ static LRESULT CALLBACK msg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
 
 /* ---- entry ------------------------------------------------------------- */
 
-void engine_run(void)
+/* quiet: started by the sign-in task (-startup): never open a window. */
+void engine_run(BOOL quiet)
 {
     HINSTANCE inst = GetModuleHandleW(NULL);
     PROCESS_POWER_THROTTLING_STATE eco;
     HPOWERNOTIFY pn1, pn2;
-    WCHAR exe[MAX_PATH];
+    WCHAR cmd[MAX_PATH + 16];
     LARGE_INTEGER f;
     WNDCLASSW wc;
     HANDLE mutex;
@@ -619,10 +620,12 @@ void engine_run(void)
 
     mutex = CreateMutexW(NULL, TRUE, L"Local\\livewall.engine");
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        /* Already running (e.g. the exe was opened again): show settings. */
+        /* Already running. Opened again by the user: show settings.
+           Started again at sign-in: nothing to do. */
         if (mutex)
             CloseHandle(mutex);
-        settings_run(FALSE);
+        if (!quiet)
+            settings_run(FALSE);
         return;
     }
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -636,10 +639,11 @@ void engine_run(void)
     SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &eco, sizeof eco);
 
     first = !config_load(&cfg);
-    GetModuleFileNameW(NULL, exe, MAX_PATH);
-    if (cfg.autostart && !str_ieq(cfg.autostart_exe, exe) && autostart_apply(TRUE))
-        str_copy(cfg.autostart_exe, exe, MAX_PATH); /* first run, or the exe moved */
-    if (first || !str_ieq(cfg.autostart_exe, exe))
+    autostart_command(cmd);
+    /* First run, the exe moved, or a task from before -startup existed. */
+    if (cfg.autostart && !str_ieq(cfg.autostart_exe, cmd) && autostart_apply(TRUE))
+        str_copy(cfg.autostart_exe, cmd, MAX_PATH + 16);
+    if (first || !str_ieq(cfg.autostart_exe, cmd))
         config_save(&cfg);
 
     QueryPerformanceFrequency(&f);
@@ -678,8 +682,8 @@ void engine_run(void)
     pn2 = RegisterPowerSettingNotification(e.msg, &kPowerSource, DEVICE_NOTIFY_WINDOW_HANDLE);
     SetCoalescableTimer(e.msg, 1, POLL_MS, NULL, 100);
     poll();
-    if (first)
-        spawn_self(L"-settings"); /* first launch: show what it is */
+    if (first && !quiet)
+        spawn_self(L"-settings"); /* first launch by the user: show what it is */
 
     /* Sleep until the frame timer fires or a message arrives. */
     for (;;) {

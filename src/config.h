@@ -29,7 +29,7 @@ typedef struct {
     UINT brightness;         /* percent */
     Fit fit;                 /* images and video */
     BOOL pause_covered, pause_battery, low_power, autostart;
-    WCHAR autostart_exe[MAX_PATH]; /* exe the startup task points at */
+    WCHAR autostart_exe[MAX_PATH + 16]; /* what the startup task runs: "<exe> -startup" */
     UINT lib_count;
     WCHAR lib[LIB_MAX][MAX_PATH]; /* files the user added */
 } Config;

@@ -47,6 +47,12 @@ static void cat_esc(WCHAR *xml, const WCHAR *s)
 
 BOOL autostart_query(void) { return schtasks(L"/Query /TN \"" TASK L"\""); }
 
+void autostart_command(WCHAR *out)
+{
+    GetModuleFileNameW(NULL, out, MAX_PATH);
+    str_cat(out, L" -" AUTOSTART_FLAG, MAX_PATH + 16);
+}
+
 BOOL autostart_apply(BOOL on)
 {
     WCHAR exe[MAX_PATH], user[256], name[128], path[MAX_PATH], args[MAX_PATH + 64];
@@ -102,7 +108,8 @@ BOOL autostart_apply(BOOL on)
             L"  </Settings>\r\n"
             L"  <Actions Context=\"Author\"><Exec><Command>", XML_CAP);
     cat_esc(xml, exe);
-    str_cat(xml, L"</Command></Exec></Actions>\r\n</Task>\r\n", XML_CAP);
+    str_cat(xml, L"</Command><Arguments>-" AUTOSTART_FLAG L"</Arguments></Exec></Actions>\r\n</Task>\r\n",
+            XML_CAP);
 
     app_dir(path);
     str_cat(path, L"\\task.xml", MAX_PATH);

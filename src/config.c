@@ -51,7 +51,7 @@ BOOL config_load(Config *c)
     c->pause_battery = get_uint(path, L"engine", L"pause_on_battery", 1, 0, 1);
     c->low_power = get_uint(path, L"engine", L"integrated_gpu", 0, 0, 1);
     c->autostart = get_uint(path, L"engine", L"start_with_windows", 1, 0, 1);
-    GetPrivateProfileStringW(L"engine", L"autostart_exe", L"", c->autostart_exe, MAX_PATH, path);
+    GetPrivateProfileStringW(L"engine", L"autostart_exe", L"", c->autostart_exe, MAX_PATH + 16, path);
 
     n = get_uint(path, L"library", L"count", 0, 0, LIB_MAX);
     c->lib_count = 0;

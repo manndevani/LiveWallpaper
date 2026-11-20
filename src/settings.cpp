@@ -945,7 +945,7 @@ void activate(int id)
             s.autostart = on;
             cfg.autostart = on;
             if (on)
-                GetModuleFileNameW(nullptr, cfg.autostart_exe, MAX_PATH);
+                autostart_command(cfg.autostart_exe);
         }
         SetCursor(old);
         apply(false);

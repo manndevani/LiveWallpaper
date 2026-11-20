@@ -49,7 +49,7 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 
 ## Implemented but not yet verified
 
-- [ ] **Actual start after a reboot or sign-out.** The task is registered but has not run yet (`Last Run Time: never`). Check after the next sign-in that the wallpaper appears and the log shows `engine started`.
+- [x] **Start after a reboot** (2026-11-20): the sign-in task started the engine 19 s after boot, and the wallpaper attached. That first boot opened the settings window, because the real config did not exist yet (see FINDINGS.md). Fixed with `-startup`: tested with no config at all through `schtasks /Run`, and no window appeared. A second sign-in start exits silently, and opening the exe by hand still shows settings.
 - [ ] Interactive shaders reacting to the real mouse and clicks on the desktop. The shaders render with a simulated cursor, but live input has not been checked by eye.
 - [ ] Tray menu: switching wallpapers, Add, Pause, Start with Windows, Exit. The code path is shared with the settings window, but the menu itself has not been clicked.
 - [ ] The hover ✕ that removes a library item. Can't be shown with synthetic mouse messages, because `TrackMouseEvent` sends `WM_MOUSELEAVE` at once.

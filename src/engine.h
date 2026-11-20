@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-void engine_run(void);
+void engine_run(BOOL quiet); /* quiet: started at sign-in, never open a window */
 
 #ifdef __cplusplus
 }

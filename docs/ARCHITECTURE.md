@@ -4,7 +4,8 @@
 
 | Command | Role | Lifetime |
 |---|---|---|
-| `livewall.exe` | **Engine**: wallpaper window, tray icon | always running; started at sign-in by Task Scheduler |
+| `livewall.exe` | **Engine**: wallpaper window, tray icon | always running |
+| `livewall.exe -startup` | Engine, started by the sign-in task: never opens a window | always running |
 | `livewall.exe -settings` | **Settings window** | only while open |
 | `livewall.exe -add` | Settings window, opening the file picker | only while open |
 | `livewall.exe -quit` | Stops the engine and waits until it has exited | instant |
@@ -98,4 +99,6 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 - priority 4.
 
 Logon tasks start before Explorer runs its staggered Run-key and Startup-folder apps, so the wallpaper appears early. The engine waits in state *Waiting for desktop* until Explorer's `Progman` window exists.
-If the exe moves, the next manual start re-registers the task with the new path.
+The task runs `livewall.exe -startup`. With `-startup` the engine never opens a window, not even on a first run, and a second copy started that way exits silently. Without it (the user opening the exe), a first run opens settings and a second copy opens settings too.
+
+The config stores the full task command (`autostart_exe`). If it differs from "<this exe> -startup" (the exe moved, or the task predates `-startup`), the next start re-registers the task.
