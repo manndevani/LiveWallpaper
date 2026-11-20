@@ -144,3 +144,13 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 - `config.ini` is created with a UTF-16 BOM so that `WritePrivateProfileStringW` stores Unicode paths correctly.
 - Other processes (indexer or antivirus) briefly lock `config.ini` now and then. Writers outside the app must retry.
 - Animated README preview (2026-11-20): `-snapshot` now moves a pretend cursor over time (it clicks every 3 s), so frame series of Ripples and Glow Grid show them reacting. WIC's own GIF palette (`IWICPalette::InitializeFromBitmap`) bands these dark gradients badly without dithering, and error diffusion makes the GIF ~2× bigger. A median-cut palette per frame plus a 4×4 ordered dither looked smooth: 480×270, 10 fps, 134 frames = 4.9 MB.
+
+## Linux port (2026-11-20, tested in WSL2 Ubuntu 26.04, Mesa llvmpipe, no GPU)
+
+- **Same picture as Windows.** `-snapshot` of Aurora and Dunes at 9 s on Linux and on Windows look identical by eye. The GLSL versions use `mod(float)` for HLSL's integer `%`, and y-down pixel positions (`res.y - gl_FragCoord.y`).
+- **Headless test setup:** Sway with `WLR_BACKENDS=headless WLR_RENDERER=pixman`, screenshots with `grim`; X11 with `Xvfb` and `xwd`. A fullscreen `foot` window covers the desktop.
+- **Pausing on Wayland needs no code.** Drawing waits for the compositor's frame callback. Sway sends none while a fullscreen window hides the background: 1 CPU tick in 3–5 s while covered, against ~250 per 3 s drawing on the CPU. It resumed as soon as the window closed.
+- `-pause`/`-resume`, `-set` while running (switching shader → video), and `-quit` all verified under Sway; X11 drawing, mouse (Glow Grid follows the pointer) and `-quit` verified under Xvfb.
+- The CPU numbers above are software rendering (llvmpipe). They say nothing about cost on a real GPU, which is not measured yet. Video under llvmpipe is very expensive (mpv's shaders run on the CPU), and RSS was ~330 MB; `profile=fast` was added afterwards.
+- WSL quirk: commands passed through `wsl -- sh -c "…"` from PowerShell lose `$variables`. Put test steps in a script file and run `wsl -- bash file.sh`.
+- Ubuntu has no package with `wlr-layer-shell-unstable-v1.xml`; it was taken from gitlab.freedesktop.org/wlroots/wlr-protocols.

@@ -1,5 +1,6 @@
-# Builds livewall.exe on every push and pull request, and publishes a
-# GitHub release with the zip whenever a version tag (v*) is pushed:
+# Builds livewall for Windows and Linux on every push and pull request, and
+# publishes a GitHub release with both downloads whenever a version tag (v*)
+# is pushed:
 #
 #   git tag -a v0.2.0 -m "livewall v0.2.0"
 #   git push origin v0.2.0
@@ -18,6 +19,8 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.package.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,20 +52,71 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.package.outputs.version }}
+          name: windows
           path: build/${{ steps.package.outputs.zip }}
 
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential pkg-config libwayland-dev wayland-protocols \
+            libegl-dev libgles-dev libx11-dev libmpv-dev libegl-mesa0
+
+      - name: Build
+        run: make -C linux -j4
+
+      - name: Check it stays small and draws every built-in wallpaper
+        run: |
+          size=$(stat -c %s linux/build/livewall)
+          echo "livewall: $size bytes"
+          [ "$size" -le 204800 ] || { echo "livewall grew past 200 KB"; exit 1; }
+          for w in aurora dunes nightsky ripples glowgrid; do
+            linux/build/livewall -snapshot $w /tmp/$w.png 9 320x180
+            [ -s /tmp/$w.png ] || { echo "$w did not render"; exit 1; }
+          done
+          linux/build/livewall -snapshot examples/plasma.glsl /tmp/plasma.png 9 320x180
+
+      - name: Package
+        id: package
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version=$GITHUB_REF_NAME; else version=dev-${GITHUB_SHA::7}; fi
+          dir=build/package/livewall
+          mkdir -p $dir/examples
+          cp linux/build/livewall README.md LICENSE $dir
+          cp examples/plasma.glsl $dir/examples
+          tar=livewall-$version-linux-x64.tar.gz
+          tar -C build/package -czf build/$tar livewall
+          echo "tar=$tar" >> $GITHUB_OUTPUT
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: build/${{ steps.package.outputs.tar }}
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
       - name: Publish release
-        if: github.ref_type == 'tag'
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          $tag = $env:GITHUB_REF_NAME
-          $zip = "build\${{ steps.package.outputs.zip }}"
-          gh release view $tag 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $zip --clobber
-          } else {
-            gh release create $tag $zip --title "livewall $tag" --generate-notes
-          }
+          tag=$GITHUB_REF_NAME
+          ls -la dist
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* --title "livewall $tag" --generate-notes
+          fi

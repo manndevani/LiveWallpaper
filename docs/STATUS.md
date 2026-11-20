@@ -34,13 +34,24 @@ Last updated: 2026-11-20
 - [x] Animated preview in the README (`docs/images/preview.gif`, 2026-11-20): five built-ins at 2× speed, made from `-snapshot` frames. An MP4 version for posts is made the same way (not in the repo).
 - [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
 
+## Linux (`linux/`, 2026-11-20): verified in WSL2 Ubuntu 26.04 without a GPU
+
+- [x] Builds with no warnings (~80 KB). The version comes from `src/version.h`.
+- [x] All five built-ins render through `-snapshot` and match the Windows pictures; `examples/plasma.glsl` (Shadertoy-style) works.
+- [x] Video, GIF and PNG through libmpv (`-snapshot` and live under Sway).
+- [x] Wayland (headless Sway): draws on the background layer, `-set` switches while running, pauses when a fullscreen window covers it and resumes when it closes, `-pause`/`-resume`, `-quit`.
+- [x] X11 (Xvfb): draws, the pointer moves Glow Grid, `-quit`.
+- [ ] Not yet tried on a real Linux PC with a GPU: cost, multi-monitor, HiDPI scale, KDE Plasma, Hyprland, a real X11 desktop with icons, libmpv hardware decoding, the XDG autostart entry, pause on battery.
+- [ ] No settings window or tray icon on Linux yet; everything is a command.
+- [ ] GNOME can't be supported this way (no layer-shell).
+
 ## Releasing
 
 1. Bump `src/version.h`.
 2. Commit and push.
 3. `git tag -a vX.Y.Z -m "livewall vX.Y.Z"` and `git push origin vX.Y.Z`.
 
-GitHub Actions (`.github/workflows/build.yml`) builds the exe and creates the release with the zip. Every push to `main` also builds, and the zip is kept as a downloadable workflow artifact.
+GitHub Actions (`.github/workflows/build.yml`) builds the Windows exe and the Linux binary (and checks every built-in renders on Linux), then creates the release with both downloads. Every push to `main` also builds, and the zip is kept as a downloadable workflow artifact.
 
 **Code signing:** SignPath Foundation (free for open source) **turned the application down on 2026-11-20**. The reason was not enough public visibility yet: they look for stars, forks, contributors, articles and discussions (Reddit, YouTube…). They invited a new application once the project is better known; a paid SignPath plan is the other route. If approved later:
 - add a signing step to the workflow, after Package and before Publish;
@@ -75,7 +86,7 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 
 ## Ideas / next
 
-- Other platforms (Linux, macOS, Android). This needs a shared portable core first; see the plan in the README's roadmap.
+- Other platforms: Android and macOS next. They will reuse `shaders/glsl/`.
 
 - Show shader compile errors in the settings inspector.
 - Per-monitor wallpapers (one swap chain per monitor).

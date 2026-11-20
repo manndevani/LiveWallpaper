@@ -1,0 +1,5 @@
+# Files used by Linux tools must keep LF line endings.
+*.sh text eol=lf
+Makefile text eol=lf
+*.glsl text eol=lf
+*.xml text eol=lf

@@ -3,7 +3,7 @@
 <h1 align="center">livewall</h1>
 
 <p align="center">
-  <b>Free, open-source live wallpaper for Windows 10 and 11.</b><br>
+  <b>Free, open-source live wallpaper for Windows 10, 11 and Linux.</b><br>
   Animated, video, GIF and picture wallpapers behind your desktop icons, using about <b>3 MB</b> of memory.
 </p>
 
@@ -11,6 +11,7 @@
   <a href="https://github.com/manndevani/LiveWallpaper/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/manndevani/LiveWallpaper?label=download&style=for-the-badge"></a>
   <img alt="Size" src="https://img.shields.io/badge/size-114%20KB-2a78d6?style=for-the-badge">
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2a78d6?style=for-the-badge">
+  <img alt="Linux" src="https://img.shields.io/badge/Linux-Wayland%20%7C%20X11-2a78d6?style=for-the-badge">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a78d6?style=for-the-badge"></a>
 </p>
 
@@ -56,7 +57,7 @@ Click a wallpaper to apply it. Adjust speed, brightness, frame rate, resolution 
 
 ## Download and run
 
-1. Download the zip from **[Releases](https://github.com/manndevani/LiveWallpaper/releases/latest)**.
+1. Download the zip from **[Releases](https://github.com/manndevani/LiveWallpaper/releases/latest)**. On Linux, see the [Linux guide](docs/LINUX.md).
 2. Unzip it and run `livewall.exe`.
 3. Pick a wallpaper. From now on it starts with Windows by itself, quietly, with no window: just a small icon next to the clock.
 
@@ -89,7 +90,7 @@ After a moment paused, it gives its memory back to Windows (0.3 MB). Still pictu
 | Platform | Status |
 |---|---|
 | Windows 10 / 11 | ✅ Available |
-| Linux (KDE, Sway, Hyprland, X11) | 🛠️ Planned |
+| Linux (Sway, Hyprland, KDE Plasma 6, X11 desktops) | ✅ Available, controlled from the command line ([guide](docs/LINUX.md)) |
 | macOS | 🛠️ Planned |
 | Android | 🛠️ Planned |
 | iPhone / iPad | ⚠️ iOS doesn't allow live wallpapers; video/Live Photo export planned |
@@ -102,7 +103,7 @@ livewall is free and always will be. If it makes your desktop nicer:
 - ☕ [Buy me a coffee](https://buymeacoffee.com/manndevani)
 - ⭐ Star this repo and tell a friend
 
-Bug reports, wallpapers, testing on other PCs and help with the Linux, Mac and Android versions are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports, wallpapers, testing on other PCs and help with the Mac and Android versions and testing on more Linux desktops are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -165,4 +166,4 @@ Release builds are made by [GitHub Actions](.github/workflows/build.yml) from th
 
 MIT: free for everyone to use, change and share. See [LICENSE](LICENSE).
 
-<sub>Keywords: live wallpaper for Windows 11, animated wallpaper for Windows 10, video wallpaper, GIF wallpaper, desktop customization, lightweight live wallpaper, free open-source wallpaper app, shader wallpaper, interactive wallpaper.</sub>
+<sub>Keywords: live wallpaper for Windows 11, animated wallpaper for Windows 10, video wallpaper, GIF wallpaper, desktop customization, lightweight live wallpaper, free open-source wallpaper app, shader wallpaper, interactive wallpaper, live wallpaper for Linux, Wayland wallpaper, Hyprland and Sway animated wallpaper.</sub>

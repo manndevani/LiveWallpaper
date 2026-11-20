@@ -102,3 +102,21 @@ Logon tasks start before Explorer runs its staggered Run-key and Startup-folder 
 The task runs `livewall.exe -startup`. With `-startup` the engine never opens a window, not even on a first run, and a second copy started that way exits silently. Without it (the user opening the exe), a first run opens settings and a second copy opens settings too.
 
 The config stores the full task command (`autostart_exe`). If it differs from "<this exe> -startup" (the exe moved, or the task predates `-startup`), the next start re-registers the task.
+
+## Linux (`linux/`, since 2026-11-20)
+
+A separate, small C program (~80 KB) with the same ideas as the Windows engine. It doesn't share code with `src/`, only the config format and the shaders.
+
+| File | Responsibility |
+|---|---|
+| `main.c` | Commands (`-set`, `-list`, `-quit`, `-pause`, `-snapshot`…), the engine loop (`poll()` on the display, a timerfd for frames, a signalfd, libmpv's wake-up eventfd), EGL setup, battery check, XDG autostart entry |
+| `config.c` | `~/.config/livewall/config.ini` (same sections and keys as Windows; `autostart` instead of `start_with_windows`). Written atomically (temp file + rename) |
+| `gl.c` | OpenGL ES 2.0: builds shaders as `prelude.glsl` + body + `epilogue.glsl`; Shadertoy-style custom files get a small adapter. Lower resolution renders into a texture that is then stretched. Brightness is a black quad with alpha |
+| `media.c` | Videos, GIFs, pictures through libmpv's render API, loaded with `dlopen` (optional). `hwdec=auto-safe`, `profile=fast`, no audio, small demuxer cache |
+| `wayland.c` | One wlr-layer-shell surface per monitor on the *background* layer. Draws only after the compositor's frame callback, so it stops by itself when hidden |
+| `x11.c` | One `_NET_WM_WINDOW_TYPE_DESKTOP` window covering the screen, kept below. "Covered" = the active window is fullscreen or maximized |
+| `png.c` | Tiny PNG writer for `-snapshot` |
+
+- The shaders live in `shaders/glsl/` and are GLSL ES 1.00 twins of `src/shaders/*.hlsl`. `pos` is in pixels with y down, like Direct3D, so the two versions match line for line. Android and macOS will use the same files.
+- Commands talk to the running engine with signals: they write `config.ini` and send `SIGHUP` (reload), `SIGUSR1` (pause), `SIGUSR2` (resume) or `SIGTERM` (quit). The pid file is `$XDG_RUNTIME_DIR/livewall.pid`, held with `flock`.
+- `make -C linux` needs the dev packages listed in `docs/LINUX.md`. The layer-shell protocol XML is kept in `linux/protocols/` (from the wlroots project, permissive license).
