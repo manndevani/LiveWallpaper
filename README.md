@@ -2,7 +2,7 @@
 
 A tiny live wallpaper for Windows 10/11: shaders, videos, GIFs, images and your own HLSL shaders, drawn behind the desktop icons.
 
-- **Light:** a ~90 KB exe with no runtime and no installer. About 14 MB of memory and ~0.1% CPU for a shader wallpaper. It stops drawing completely whenever nobody can see it.
+- **Light:** a ~90 KB exe with no runtime and no installer. About 3 MB of memory and ~0.1% CPU for a shader wallpaper while it draws. It stops drawing completely whenever nobody can see it.
 - **Starts with Windows**, early: a logon task starts it before the usual startup apps.
 - **Settings window** that follows your light/dark theme and accent color. It runs as a separate process, so the wallpaper itself never carries UI memory.
 

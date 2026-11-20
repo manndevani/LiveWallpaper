@@ -9,6 +9,13 @@
 #include <mfapi.h>
 #include <mfmediaengine.h>
 
+/* Real-time (low-latency) mode keeps fewer decoded frames queued: 36 -> 14 MB
+   for the same smooth playback (FINDINGS.md). Overridable with -DLW_ME_FLAGS=
+   for measurements. */
+#ifndef LW_ME_FLAGS
+#define LW_ME_FLAGS MF_MEDIA_ENGINE_REAL_TIME_MODE
+#endif
+
 static IMFMediaEngine *eng;
 static IMFDXGIDeviceManager *mgr;
 static volatile LONG broken;
@@ -103,7 +110,7 @@ static BOOL v_open(const WCHAR *path, SourceInfo *info)
         hr = CoCreateInstance(&CLSID_MFMediaEngineClassFactory, NULL, CLSCTX_INPROC_SERVER,
                               &IID_IMFMediaEngineClassFactory, (void **)&cf);
     if (SUCCEEDED(hr))
-        hr = IMFMediaEngineClassFactory_CreateInstance(cf, 0, attr, &eng);
+        hr = IMFMediaEngineClassFactory_CreateInstance(cf, LW_ME_FLAGS, attr, &eng);
     RELEASE(cf);
     RELEASE(attr);
     if (SUCCEEDED(hr)) {

@@ -15,7 +15,8 @@ Last updated: 2026-11-20
   - Follows dark mode and the Windows accent color.
 - [x] Clicking a card writes `config.ini` and the engine switches (`livewall.reload`).
 - [x] Start at sign-in: Task Scheduler logon task `livewall` registered on first run (`schtasks /Query /TN livewall` → Ready).
-- [x] Engine cost measured (see FINDINGS.md): 14 MB / ~0.1% CPU for shaders; 0 GPU when covered.
+- [x] Engine cost measured (see FINDINGS.md): ~3 MB / ~0.1% CPU for shaders while drawing (14 MB before the 2026-11-20 trim work); 0 GPU when covered.
+- [x] Memory while drawing (2026-11-20): one trim 5 s after drawing starts takes shaders from 14.5 to ~3 MB, steady over 3 minutes, ~1 page fault/s. Video in real-time mode is 14 MB instead of 36 at the same 29–30 fps. `tools/wsdetail.ps1` shows where memory goes.
 - [x] `-quit` waits for the engine to exit, so stop-then-start works in scripts.
 - [x] Idle memory (2026-11-20):
   - paused shader **0.3 MB**;
@@ -61,7 +62,7 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 
 - One swap chain spans all monitors. On mixed-DPI or mixed-refresh setups that works, but it isn't per-monitor. Different wallpapers per monitor are not supported.
 - Video `Stretch` is applied by the video processor's destination rect. Some codecs may still letterbox.
-- Video is the most expensive type (~59 MB and ~150 ms/s GPU for a small 640×360 clip). Larger 4K files will cost more.
+- Video is the most expensive type (~14 MB and ~140 ms/s GPU for a small 640×360 clip). Larger 4K files will cost more.
 - No audio, by design. No web/HTML wallpapers.
 - Choosing a still picture **changes the Windows wallpaper setting**: that is how it costs nothing. The previous Windows wallpaper is not restored when you switch away. It is hidden behind the live one, and shows again only if livewall exits.
 - Settings for a still picture (fit and brightness) are applied by Windows. The cover/contain/stretch modes map to Fill/Fit/Stretch.

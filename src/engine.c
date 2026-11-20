@@ -44,7 +44,8 @@ static struct {
 
     BOOL parked;            /* the source freed its decoder during a long pause */
     BOOL trimmed;           /* memory handed back since we last drew */
-    LONGLONG idle_since, trimmed_at;
+    BOOL settled;           /* startup-only memory handed back since drawing began */
+    LONGLONG idle_since, trimmed_at, run_since;
 
     HANDLE timer;
     LONGLONG qpf, interval, due, last;
@@ -184,7 +185,8 @@ static void update_state(void)
                 e.src->park(FALSE);
             }
             QueryPerformanceCounter(&now);
-            e.last = e.due = now.QuadPart;
+            e.last = e.due = e.run_since = now.QuadPart;
+            e.settled = FALSE;
             arm_timer(e.due);
         } else {
             LARGE_INTEGER now;
@@ -243,16 +245,32 @@ static BOOL wall_attach(void)
     return TRUE;
 }
 
-/* Hands memory back to Windows while nothing is being drawn. Whatever is
-   needed again comes back on the next frame (from RAM, if Windows still has
-   it, which it usually does). Re-done once a minute while idle, since the
-   500 ms poll touches a few pages. */
-static void trim_if_idle(void)
+static void trim_now(void)
+{
+    HeapCompact(GetProcessHeap(), 0);
+    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+}
+
+/* Hands memory back to Windows. Whatever is needed again comes back on the
+   next frame (from RAM, if Windows still has it, which it usually does).
+
+   While drawing: once, 5 s after drawing starts. Most of the ~14 MB a fresh
+   D3D device holds (shader compilation, driver setup) is never touched again;
+   the per-frame set is ~2-3 MB, and it stays at that (FINDINGS.md).
+
+   While idle: after 2 s, and again once a minute, since the 500 ms poll
+   touches a few pages. */
+static void trim_memory(void)
 {
     LARGE_INTEGER now;
-    if (e.running)
-        return;
     QueryPerformanceCounter(&now);
+    if (e.running) {
+        if (!e.settled && now.QuadPart - e.run_since >= 5 * e.qpf) {
+            trim_now();
+            e.settled = TRUE;
+        }
+        return;
+    }
     if (now.QuadPart - e.idle_since < 2 * e.qpf)
         return; /* wait a little: covering and uncovering often come in quick pairs */
     if (!e.parked && e.src && e.src->park && now.QuadPart - e.idle_since >= 10 * e.qpf) {
@@ -262,8 +280,7 @@ static void trim_if_idle(void)
     }
     if (e.trimmed && now.QuadPart - e.trimmed_at < 60 * e.qpf)
         return;
-    HeapCompact(GetProcessHeap(), 0);
-    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+    trim_now();
     e.trimmed = TRUE;
     e.trimmed_at = now.QuadPart;
 }
@@ -397,7 +414,7 @@ static void poll(void)
     update_state();
     if (e.lost)
         recover();
-    trim_if_idle();
+    trim_memory();
     busy = FALSE;
 }
 

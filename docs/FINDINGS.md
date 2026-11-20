@@ -45,11 +45,11 @@ Measured with `tools/measure.ps1 -Render`, forced to render even though windows 
 | Shader, paused (covered) | **0.3 MB** | 16 | working set handed back 2 s after pausing |
 | Video, paused | **1.2 MB** | 20 | Media Foundation pipeline closed after 10 s paused; resumes at the same position (verified 29–30 fps right after resume) |
 | Still picture (also dimmed) | **0.5 MB** | 9 | handed to Windows; no D3D device, no window |
-| Shader, rendering | 14.3 MB | 16 | unchanged; the GPU driver is the floor (~10 MB) |
-| Video, rendering | 59–68 MB | 26 | unchanged |
+| Shader, rendering | 14.3 MB | 16 | at the time; see "Memory while drawing" below (now ~2–3 MB) |
+| Video, rendering | 59–68 MB | 26 | at the time; now ~14 MB (see below) |
 
 - "Private WS" is what Task Manager shows as Memory. Trimming (`SetProcessWorkingSetSize(-1, -1)` plus `HeapCompact`) moves pages to the standby list. They come back as soft faults when drawing resumes, which is cheap. Committed memory does not shrink. Freeing the decoder (video) and handing pictures to Windows does shrink it.
-- Below ~10 MB while *rendering* is not reachable on Windows: the user-mode GPU driver alone is about that size.
+- An earlier note here said that less than ~10 MB while *rendering* was not reachable, because the GPU driver alone is that big. That was wrong: most of the driver memory is touched only once; see "Memory while drawing" below.
 
 ### Shader resolution: half vs full (2026-11-20, same machine, 1920×1080)
 
@@ -64,6 +64,48 @@ Half resolution (960×540, stretched by DWM) looked visibly soft on a 1080p scre
 - That is about 3.3 ms of GPU work per frame at 30 fps. Memory and CPU don't change.
 - It still pauses at zero cost when covered or on battery.
 - Measure with `tools\measure.ps1 -Render -Resolution 1|2`.
+
+## Memory while drawing (2026-11-20, same machine, 1920×1080, full-res shaders)
+
+**Where the 14 MB went.** `tools\wsdetail.ps1` walks the process with `VirtualQueryEx` and `QueryWorkingSetEx` and groups the private resident pages by owner:
+
+| Owner | NVIDIA (default) | Intel (`integrated_gpu=1`) |
+|---|---|---|
+| Private allocations (driver and D3D heaps) | 9.9 MB | 10.3 MB |
+| `nvwgf2umx.dll` + `nvgpucomp64.dll` (NVIDIA driver and shader compiler data) | 2.5 MB | – |
+| `igc64.dll` (Intel shader compiler) | 0.7 MB | 0.7 MB |
+| Everything else, livewall.exe included | < 1 MB | < 1 MB |
+| **Total** | 14.8 MB | 12.4 MB |
+
+livewall's own code and data are a rounding error. It's all the graphics driver, and most of that is **touched once**: creating the device and compiling shaders. Measured by emptying the working set once, from outside, while it kept drawing:
+
+| | Before | Steady state after one trim |
+|---|---|---|
+| NVIDIA | 14.5 MB, 16 threads | **3.0 MB**, stays there for minutes |
+| Intel | 12.1 MB, 6 threads | **1.6 MB** |
+
+Page faults afterwards: ~1/s on average (0 most of the time). The per-frame set is small, so nothing thrashes.
+
+So the engine now trims once **5 s after drawing starts** (`trim_memory` in engine.c). It's the same call it already used while paused. Results with the engine doing it itself:
+
+| Wallpaper | NVIDIA | Intel |
+|---|---|---|
+| Built-in shaders | 2.0 MB at 25 s, ~3.0 MB plateau from 60 s to 3 min | 1.0–1.1 MB |
+| GIF 320×180 | 3.2 MB | 2.2 MB |
+| MP4 640×360 | 34–38 MB (see below) | 10.8 MB |
+
+**Video.** Decoding does run on the GPU (the `videodecode` engine is busy). The 36 MB is Media Foundation's frame queue.
+- `MF_MEDIA_ENGINE_REAL_TIME_MODE` (low-latency mode, fewer buffered frames) brings it to **14 MB** at the same 29–30 fps.
+- `MF_MEDIA_ENGINE_FORCEMUTE` saves only ~5 MB on its own and nothing on top of real-time mode, so it isn't used.
+
+**Snapshot gotcha (fixed).** With real-time mode, the video size is known before the first frame is decoded. A forced `TransferVideoFrame` at that point copies black. `-snapshot` of a video now waits for a real frame (`OnVideoStreamTick == S_OK`).
+
+**What trimming is and isn't.**
+- Trimmed pages go to the standby/modified lists. Windows keeps them in RAM (compressed if needed) until something else wants the memory.
+- Task Manager's Memory column (private working set) shows the real resident cost.
+- Commit charge does not shrink.
+
+**Picking the GPU matters too.** The integrated GPU is lighter in every way here: half the memory, 6 threads instead of 16, and ~55 ms/s GPU time instead of ~95 for the same shader.
 
 ## Packaged-app AppData redirection (2026-11-20)
 

@@ -65,8 +65,9 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
   - display off;
   - on battery.
   The last frame stays on screen.
-- **Idle memory:**
-  - 2 s after drawing stops, the working set is handed back (`trim_if_idle`), and again every 60 s while idle.
+- **Memory:**
+  - 5 s after drawing starts, the working set is handed back once (`trim_memory`). Most of a fresh device's memory is only touched during setup; the per-frame set is ~2–3 MB.
+  - 2 s after drawing stops, it is handed back again, and again every 60 s while idle.
   - After 10 s, a source with `park()` (video) frees its decoder. On resume it reopens at the same position.
 - **Still pictures** never get a device: `still.c` hands them to Windows (`IDesktopWallpaper`, with a dimmed copy when brightness < 100%). The engine then keeps only its tray icon. If Windows refuses, the engine draws the picture itself.
 - **Device loss / GPU switch** → `recover()` rebuilds the device and reopens the source.
