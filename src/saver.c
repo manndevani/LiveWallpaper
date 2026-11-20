@@ -28,6 +28,8 @@ static struct {
     BOOL have_pos, display_off, animate, lost;
     BOOL trimmed;
     BOOL locking;  /* asked Windows to lock; waiting for it before closing */
+    BOOL faded;    /* the fade to black after the click is done */
+    LONGLONG lock_at;
     POINT start;
     DWORD started;
     const Source *src;
@@ -37,6 +39,9 @@ static struct {
 } v;
 
 #define LOCK_WAIT_MS 3000 /* the most we stay up waiting for Windows to lock */
+#define FADE_S 0.15       /* fade to black on the click, so it answers at once */
+
+static void render(BOOL force);
 
 static void finish(void)
 {
@@ -53,6 +58,9 @@ static void finish(void)
             if (LockWorkStation()) {
                 log_line(L"screen saver: locking (lock shortcut)");
                 v.locking = TRUE;
+                QueryPerformanceCounter((LARGE_INTEGER *)&v.lock_at);
+                if (v.src)
+                    render(TRUE); /* first fade step right away */
                 SetTimer(v.wnd, 1, LOCK_WAIT_MS, NULL);
             } else {
                 log_line(L"screen saver: could not lock (%u)", GetLastError());
@@ -150,9 +158,20 @@ static void render(BOOL force)
     f.time = v.anim;
     f.phase = phase_at(v.anim);
     f.click_age = 1.0e4f;
+    if (v.locking)
+        force = TRUE; /* stills and paused frames must redraw for the fade */
     if (v.src->draw(&f, force)) {
         HRESULT hr;
-        gfx_dim(1.0f - cfg.brightness / 100.0f);
+        float dim = 1.0f - cfg.brightness / 100.0f;
+        if (v.locking) { /* fade to black, then hold it until Windows has locked */
+            float t = (float)((double)(now.QuadPart - v.lock_at) / (double)v.qpf / FADE_S);
+            if (t >= 1.0f) {
+                t = 1.0f;
+                v.faded = TRUE;
+            }
+            dim += (1.0f - dim) * t;
+        }
+        gfx_dim(dim);
         hr = gfx_present();
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
             v.lost = TRUE; /* keep the last frame; a screen saver can simply stop */
@@ -267,7 +286,7 @@ static int run(HWND parent)
         timer = CreateWaitableTimerW(NULL, FALSE, NULL);
 
     for (;;) {
-        BOOL want = v.src && v.animate && !v.display_off && !v.lost && timer;
+        BOOL want = v.src && (v.locking ? !v.faded : v.animate) && !v.display_off && !v.lost && timer;
         DWORD wr;
         if (want != ticking) {
             if (want) {
