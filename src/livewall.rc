@@ -3,6 +3,10 @@
 #include <winver.h>
 #include "version.h"
 
+// The exe's icon in Explorer. Same picture as make_app_icon() in util.c
+// (which draws the tray and window icons at runtime).
+1 ICON "livewall.ico"
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION    LW_VERSION_MAJOR, LW_VERSION_MINOR, LW_VERSION_PATCH, 0
  PRODUCTVERSION LW_VERSION_MAJOR, LW_VERSION_MINOR, LW_VERSION_PATCH, 0

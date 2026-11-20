@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/logo.png" alt="livewall icon" width="96"></p>
+
 <h1 align="center">livewall</h1>
 
 <p align="center">
@@ -7,7 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/manndevani/LiveWallpaper/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/manndevani/LiveWallpaper?label=download&style=for-the-badge"></a>
-  <img alt="Size" src="https://img.shields.io/badge/size-94%20KB-2a78d6?style=for-the-badge">
+  <img alt="Size" src="https://img.shields.io/badge/size-114%20KB-2a78d6?style=for-the-badge">
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2a78d6?style=for-the-badge">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a78d6?style=for-the-badge"></a>
 </p>
@@ -18,7 +20,7 @@
 
 | The numbers | What they mean |
 |---|---|
-| 🪶 **94 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
+| 🪶 **114 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
 | 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
 | 💤 **0% GPU** | When a window covers the desktop, it stops completely and uses no graphics power. |
 | ⚡ **~0.1% CPU** | Barely touches your processor. The graphics card does the work. |
