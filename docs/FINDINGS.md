@@ -132,7 +132,7 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
   - The Media Foundation pipeline adds ~45 MB and ~10 threads.
   - `TransferVideoFrame` color-converts and scales every frame to the full back buffer.
   - It is still small next to any browser tab, and it pauses like everything else.
-- The settings process uses ~18 MB while open and 0 when closed.
+- The settings process used ~18 MB while open, and 0 once closed. Since 2026-11-20 it hands memory back once thumbnails are built and the window has had no input for 3 s, or as soon as it goes to the background. It is ~19 MB for the first second or two, then ~3–4 MB while open (sampled every second with the window in front). Drawing it with Direct2D's software renderer instead was worse: it held ~9.6 MB, because it keeps and redraws a full CPU copy of the window every second (the fps readout).
 - Exe size: ~90 KB, everything included. The engine-only v1 was 16 KB.
 
 ## Misc

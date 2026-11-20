@@ -18,6 +18,7 @@ Last updated: 2026-11-20
 - [x] Engine cost measured (see FINDINGS.md): ~3 MB / ~0.1% CPU for shaders while drawing (14 MB before the 2026-11-20 trim work); 0 GPU when covered.
 - [x] Memory while drawing (2026-11-20): one trim 5 s after drawing starts takes shaders from 14.5 to ~3 MB, steady over 3 minutes, ~1 page fault/s. Video in real-time mode is 14 MB instead of 36 at the same 29–30 fps. `tools/wsdetail.ps1` shows where memory goes.
 - [x] Software rendering fallback (2026-11-20, forced with `-DLW_FORCE_WARP=1`). Shaders, GIF and MP4 all run on it. Snapshots of the shader and the video are correct, and both hold 29 fps live. A shader at Auto (640×360) costs ~2.6% of 24 threads (~60% of one core) and 0.7 MB; video costs ~0.6% CPU.
+- [x] Settings window memory (2026-11-20): ~19 MB while building thumbnails, then ~3–4 MB while open (was ~18 MB the whole time). The window still draws and clicks correctly after the trim (captured and clicked).
 - [x] `-quit` waits for the engine to exit, so stop-then-start works in scripts.
 - [x] Idle memory (2026-11-20):
   - paused shader **0.3 MB**;

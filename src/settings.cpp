@@ -98,9 +98,34 @@ struct State {
     EngineInfo engine;
     bool autostart;
     bool thumb_posted;
+    bool trimmed;        /* memory handed back since the last input */
+    DWORD last_input;    /* GetTickCount of the last mouse/keyboard input */
     Thumb thumbs[LIB_MAX + 16];
     int nthumbs;
 } s;
+
+/* Like the engine: most of what Direct2D and the driver hold is needed only
+   while building the window and its thumbnails. Hand it back to Windows once
+   the window has been left alone; anything needed again pages back in
+   cheaply on the next paint. */
+void trim_memory()
+{
+    HeapCompact(GetProcessHeap(), 0);
+    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+    s.trimmed = true;
+}
+
+void note_input()
+{
+    s.last_input = GetTickCount();
+    s.trimmed = false;
+}
+
+void trim_if_quiet() /* from the 1 s timer */
+{
+    if (!s.trimmed && !s.thumb_posted && GetTickCount() - s.last_input > 3000)
+        trim_memory();
+}
 
 /* ---- small helpers ----------------------------------------------------- */
 
@@ -772,7 +797,8 @@ bool create_target()
     GetClientRect(s.hwnd, &rc);
     float dpi = (float)GetDpiForWindow(s.hwnd);
     D2D1_RENDER_TARGET_PROPERTIES p =
-        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(), dpi, dpi);
+        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
+                                     D2D1::PixelFormat(), dpi, dpi);
     D2D1_HWND_RENDER_TARGET_PROPERTIES hp =
         D2D1::HwndRenderTargetProperties(s.hwnd, D2D1::SizeU((UINT32)rc.right, (UINT32)rc.bottom));
     if (FAILED(s.d2d->CreateHwndRenderTarget(p, hp, &s.rt)))
@@ -980,15 +1006,20 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
     case WM_ACTIVATE:
         if (LOWORD(w) != WA_INACTIVE && !s.drag) { /* pick up changes made from the tray */
+            note_input();
             config_load(&cfg);
             refresh_engine();
             invalidate();
+        } else if (LOWORD(w) == WA_INACTIVE && !s.thumb_posted) {
+            trim_memory(); /* in the background: give it back right away */
         }
         break;
     case WM_TIMER:
         refresh_engine();
+        trim_if_quiet();
         return 0;
     case WM_MOUSEMOVE: {
+        note_input();
         float x = dip(GET_X_LPARAM(l)), y = dip(GET_Y_LPARAM(l));
         if (s.drag) {
             set_slider(s.drag, x);
@@ -1010,6 +1041,7 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
         }
         return 0;
     case WM_LBUTTONDOWN: {
+        note_input();
         float x = dip(GET_X_LPARAM(l)), y = dip(GET_Y_LPARAM(l));
         s.pressed = hit_at(x, y);
         SetCapture(h);
@@ -1034,6 +1066,7 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
     }
     case WM_MOUSEWHEEL: {
+        note_input();
         POINT p = {GET_X_LPARAM(l), GET_Y_LPARAM(l)};
         ScreenToClient(h, &p);
         if (inside(s.grid, dip(p.x), dip(p.y))) {
@@ -1043,6 +1076,7 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
         return 0;
     }
     case WM_KEYDOWN:
+        note_input();
         if (w == VK_ESCAPE)
             DestroyWindow(h);
         return 0;

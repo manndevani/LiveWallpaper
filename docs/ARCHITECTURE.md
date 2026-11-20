@@ -11,7 +11,7 @@
 | `livewall.exe -snapshot <id> <out.png> [sec]` | Renders one frame offscreen (testing) | instant |
 
 The UI lives in a separate process so the engine never pays for Direct2D, DirectWrite, the shell or thumbnails.
-Closing the settings window returns all of that memory.
+Closing the settings window returns all of that memory. While it is open it hands back what it no longer touches (after 3 s without input, or when it goes to the background): ~3–4 MB instead of ~18.
 Running `livewall.exe` while the engine is already up opens settings instead of starting a second engine.
 
 ```
