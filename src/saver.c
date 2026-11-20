@@ -13,6 +13,7 @@
 #include "source.h"
 #include "settings.h"
 #include "lock.h"
+#include <wtsapi32.h>
 
 #define MOVE_PX 10     /* mouse movement that ends the screen saver */
 #define GRACE_MS 600   /* ignore movement and keys right after starting (the Preview click, the shortcut keys) */
@@ -26,6 +27,7 @@ static struct {
     BOOL preview;
     BOOL have_pos, display_off, animate, lost;
     BOOL trimmed;
+    BOOL locking;  /* asked Windows to lock; waiting for it before closing */
     POINT start;
     DWORD started;
     const Source *src;
@@ -34,22 +36,32 @@ static struct {
     double anim;
 } v;
 
+#define LOCK_WAIT_MS 3000 /* the most we stay up waiting for Windows to lock */
+
 static void finish(void)
 {
     HANDLE ev;
-    if (v.preview)
+    if (v.preview || v.locking)
         return;
-    /* Started by the lock shortcut: lock right now, before shutting down, so
-       the PIN screen comes at once (the engine also locks once we exit). */
+    /* Started by the lock shortcut: lock right now, and stay on screen until
+       Windows reports the PC locked, so the desktop never shows in between
+       (the engine also locks once we exit, as a backup). */
     ev = OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, FALSE, LOCK_EVENT);
     if (ev) {
         if (WaitForSingleObject(ev, 0) == WAIT_OBJECT_0) {
             ResetEvent(ev);
-            LockWorkStation();
+            if (LockWorkStation()) {
+                log_line(L"screen saver: locking (lock shortcut)");
+                v.locking = TRUE;
+                SetTimer(v.wnd, 1, LOCK_WAIT_MS, NULL);
+            } else {
+                log_line(L"screen saver: could not lock (%u)", GetLastError());
+            }
         }
         CloseHandle(ev);
     }
-    PostMessageW(v.wnd, WM_CLOSE, 0, 0);
+    if (!v.locking)
+        PostMessageW(v.wnd, WM_CLOSE, 0, 0);
 }
 
 static LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
@@ -103,6 +115,16 @@ static LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
                 v.display_off = *(const DWORD *)ps->Data == 0;
         }
         return TRUE;
+    case WM_WTSSESSION_CHANGE:
+        if (v.locking && w == WTS_SESSION_LOCK) /* the lock screen is up: safe to go */
+            PostMessageW(h, WM_CLOSE, 0, 0);
+        return 0;
+    case WM_TIMER:
+        if (w == 1) { /* no lock report in time: close anyway; the engine locks too */
+            KillTimer(h, 1);
+            PostMessageW(h, WM_CLOSE, 0, 0);
+        }
+        return 0;
     case WM_ERASEBKGND:
         return 1;
     case WM_DESTROY:
@@ -217,6 +239,8 @@ static int run(HWND parent)
     if (!parent)
         SetForegroundWindow(v.wnd);
     pn = RegisterPowerSettingNotification(v.wnd, &kDisplayState, DEVICE_NOTIFY_WINDOW_HANDLE);
+    if (!parent)
+        WTSRegisterSessionNotification(v.wnd, NOTIFY_FOR_THIS_SESSION); /* see finish() */
 
     /* A screen saver can't do much about a missing GPU: the black window
        still covers the screen and Windows still locks afterwards. */
@@ -274,6 +298,8 @@ static int run(HWND parent)
 done:
     if (pn)
         UnregisterPowerSettingNotification(pn);
+    if (!parent)
+        WTSUnRegisterSessionNotification(v.wnd);
     if (timer)
         CloseHandle(timer);
     if (v.src)
