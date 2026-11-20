@@ -71,6 +71,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
   - After 10 s, a source with `park()` (video) frees its decoder. On resume it reopens at the same position.
 - **Still pictures** never get a device: `still.c` hands them to Windows (`IDesktopWallpaper`, with a dimmed copy when brightness < 100%). The engine then keeps only its tray icon. If Windows refuses, the engine draws the picture itself.
 - **Device loss / GPU switch** → `recover()` rebuilds the device and reopens the source.
+- **No GPU driver** (some virtual machines, a missing or broken driver) → `gfx_init` falls back to Direct3D's CPU renderer (WARP). `gfx.software` is set (also for the "Microsoft Basic Render Driver"), and Auto resolution then aims at 640×360 instead of 2560×1600. Build with `-DLW_FORCE_WARP=1` to test it on a normal PC.
 - The process runs at BELOW_NORMAL priority with EcoQoS (power throttling) on.
 
 ## Rendering

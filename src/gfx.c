@@ -52,36 +52,64 @@ static IDXGIAdapter1 *pick_adapter(BOOL low_power)
     return best;
 }
 
-BOOL gfx_init(BOOL low_power)
+/* Testing aid: build with -DLW_FORCE_WARP=1 to skip the GPU entirely. */
+#ifndef LW_FORCE_WARP
+#define LW_FORCE_WARP 0
+#endif
+
+static HRESULT create_device(IDXGIAdapter *ad, D3D_DRIVER_TYPE type)
 {
     static const D3D_FEATURE_LEVEL levels[] = {D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
     UINT flags = D3D11_CREATE_DEVICE_VIDEO_SUPPORT | D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS;
-    IDXGIAdapter1 *pick = pick_adapter(low_power);
-    D3D_DRIVER_TYPE type = pick ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE;
+    HRESULT hr = D3D11CreateDevice(ad, type, NULL, flags, levels, 3, D3D11_SDK_VERSION, &gfx.dev, NULL, &gfx.ctx);
+    if (FAILED(hr)) /* no video support on this adapter: shaders and images still work */
+        hr = D3D11CreateDevice(ad, type, NULL, flags & ~D3D11_CREATE_DEVICE_VIDEO_SUPPORT, levels, 3,
+                               D3D11_SDK_VERSION, &gfx.dev, NULL, &gfx.ctx);
+    return hr;
+}
+
+BOOL gfx_init(BOOL low_power)
+{
+    IDXGIAdapter1 *pick = NULL;
     D3D11_BUFFER_DESC bd;
     D3D11_SAMPLER_DESC sd;
     D3D11_BLEND_DESC bl;
     IDXGIDevice1 *dd = NULL;
     IDXGIAdapter *ad = NULL;
-    HRESULT hr;
+    IDXGIAdapter1 *ad1 = NULL;
+    DXGI_ADAPTER_DESC1 desc;
+    HRESULT hr = E_FAIL;
 
-    hr = D3D11CreateDevice((IDXGIAdapter *)pick, type, NULL, flags, levels, 3, D3D11_SDK_VERSION, &gfx.dev, NULL,
-                           &gfx.ctx);
-    if (FAILED(hr)) /* no video support on this adapter: shaders and images still work */
-        hr = D3D11CreateDevice((IDXGIAdapter *)pick, type, NULL, flags & ~D3D11_CREATE_DEVICE_VIDEO_SUPPORT, levels,
-                               3, D3D11_SDK_VERSION, &gfx.dev, NULL, &gfx.ctx);
-    RELEASE(pick);
+    if (!LW_FORCE_WARP) {
+        pick = pick_adapter(low_power);
+        hr = create_device((IDXGIAdapter *)pick, pick ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE);
+        RELEASE(pick);
+    }
+    /* No GPU driver (some virtual machines, a broken or missing driver):
+       Direct3D's own CPU renderer draws the same thing, just more slowly. */
+    if (FAILED(hr))
+        hr = create_device(NULL, D3D_DRIVER_TYPE_WARP);
     if (FAILED(hr))
         return FALSE;
 
-    /* Queue at most one frame, and use the factory that owns the device. */
+    /* Queue at most one frame, use the factory that owns the device, and
+       note whether we ended up on a CPU renderer (WARP, or the
+       "Microsoft Basic Render Driver" that Windows uses without a driver). */
+    gfx.software = FALSE;
     if (SUCCEEDED(ID3D11Device_QueryInterface(gfx.dev, &IID_IDXGIDevice1, (void **)&dd))) {
         IDXGIDevice1_SetMaximumFrameLatency(dd, 1);
-        if (SUCCEEDED(IDXGIDevice1_GetAdapter(dd, &ad)))
+        if (SUCCEEDED(IDXGIDevice1_GetAdapter(dd, &ad))) {
             IDXGIAdapter_GetParent(ad, &IID_IDXGIFactory2, (void **)&gfx.fac);
+            if (SUCCEEDED(IDXGIAdapter_QueryInterface(ad, &IID_IDXGIAdapter1, (void **)&ad1)) &&
+                SUCCEEDED(IDXGIAdapter1_GetDesc1(ad1, &desc)))
+                gfx.software = (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
+            RELEASE(ad1);
+        }
         RELEASE(ad);
         RELEASE(dd);
     }
+    if (gfx.software)
+        log_line(L"no GPU driver available: drawing on the CPU (software rendering)");
 
     memset(&bd, 0, sizeof bd);
     bd.ByteWidth = sizeof(FrameConsts);
@@ -140,14 +168,18 @@ void gfx_free(void)
    (4K, wide multi-monitor) render at 1/2 or less and the compositor scales
    them up, so the GPU cost stays about the same on any display. */
 #define AUTO_MAX_PIXELS (2560u * 1600u)
+/* With software rendering every pixel costs CPU, so Auto aims much lower
+   (1080p -> 640x360). */
+#define AUTO_MAX_PIXELS_SOFTWARE (640u * 360u)
 
 /* scale 0 means "Auto": pick it from the desktop size. */
 static UINT pick_scale(UINT w, UINT h, UINT scale)
 {
+    ULONGLONG budget = gfx.software ? AUTO_MAX_PIXELS_SOFTWARE : AUTO_MAX_PIXELS;
     if (scale)
         return scale;
     scale = 1;
-    while (scale < 4 && (ULONGLONG)(w / scale) * (h / scale) > AUTO_MAX_PIXELS)
+    while (scale < 4 && (ULONGLONG)(w / scale) * (h / scale) > budget)
         scale++;
     return scale;
 }

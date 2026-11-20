@@ -107,6 +107,19 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 
 **Picking the GPU matters too.** The integrated GPU is lighter in every way here: half the memory, 6 threads instead of 16, and ~55 ms/s GPU time instead of ~95 for the same shader.
 
+## Software rendering (WARP) fallback (2026-11-20, same machine, forced)
+
+| Wallpaper | Render size | Private WS | CPU (24 threads) | fps |
+|---|---|---|---|---|
+| Aurora | 640×360 (Auto on CPU) | 0.7 MB | 2.6–2.7 % (~60 % of one core) | 29 |
+| Ripples | 640×360 | 0.7 MB | 0.7 % | – |
+| GIF 320×180 | 1920×1080 | 1.6 MB | 1.3 % | – |
+| MP4 640×360 | 1920×1080 | 25.5 MB | 0.5–0.7 % | 29 |
+
+- The GPU Engine counters still show time for WARP processes (presentation and composition through DWM). It isn't comparable with hardware numbers.
+- Video still plays on WARP: Media Foundation decodes on the CPU, and `TransferVideoFrame` works with a WARP device.
+- `DXGI_ADAPTER_FLAG_SOFTWARE` identifies both WARP and the "Microsoft Basic Render Driver" (what Windows uses with no display driver installed).
+
 ## Packaged-app AppData redirection (2026-11-20)
 
 - When livewall is launched from inside a packaged (MSIX) app, such as a terminal hosted by a Store-packaged app, Windows redirects its `%APPDATA%` writes to `%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\`. That folder is invisible to Explorer and to the same exe launched normally.

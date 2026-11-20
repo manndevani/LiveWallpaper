@@ -6,6 +6,14 @@ A tiny live wallpaper for Windows 10/11: shaders, videos, GIFs, images and your 
 - **Starts with Windows**, early: a logon task starts it before the usual startup apps.
 - **Settings window** that follows your light/dark theme and accent color. It runs as a separate process, so the wallpaper itself never carries UI memory.
 
+## Requirements
+
+- Windows 10 or 11, 64-bit.
+- Any DirectX 10-class GPU or newer: AMD Radeon, Intel HD/UHD/Iris/Arc, NVIDIA GeForce/Quadro/RTX (roughly 2008 onward). There is no vendor-specific code. On laptops with two GPUs, livewall uses the one driving your main screen, or the integrated one if you turn on *Use integrated GPU*.
+- No GPU driver (some virtual machines)? livewall draws on the CPU instead, at a lower resolution.
+
+Tested so far on Intel + NVIDIA. If you run it on AMD, a report in [Issues](https://github.com/manndevani/LiveWallpaper/issues) helps.
+
 ## Build
 
 Requires Visual Studio 2022 (or the Build Tools) with **Desktop development with C++**.

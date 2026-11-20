@@ -41,6 +41,7 @@ typedef struct {
     UINT ww, wh;     /* window size */
     UINT bw, bh;     /* back buffer size */
     UINT scale;
+    BOOL software;   /* no usable GPU driver: Direct3D's CPU renderer (WARP) */
 } Gfx;
 
 extern Gfx gfx;
