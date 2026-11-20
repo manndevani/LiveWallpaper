@@ -153,14 +153,21 @@ BOOL lock_now(void)
     return TRUE;
 }
 
-/* Called a moment after lock_now: if the screen saver did not start (for
-   example Windows refused), lock the normal way, so the shortcut always locks. */
-void lock_check(void)
+/* Called every half second after lock_now. The screen saver counts as
+   started once Windows reports it running or its window exists (Windows
+   doesn't always report it at once). If neither shows up within 5 s, lock
+   the normal way, so the shortcut always ends locked. Returns TRUE when done. */
+BOOL lock_check(UINT waited_ms)
 {
     BOOL running = FALSE;
     SystemParametersInfoW(SPI_GETSCREENSAVERRUNNING, 0, &running, 0);
-    if (!running) {
-        log_line(L"lock shortcut: screen saver did not start, locking directly");
-        LockWorkStation();
+    if (running || FindWindowW(SAVER_CLASS, NULL)) {
+        log_line(L"lock shortcut: screen saver showing within %u ms", waited_ms);
+        return TRUE;
     }
+    if (waited_ms < 5000)
+        return FALSE;
+    log_line(L"lock shortcut: screen saver did not start, locking directly");
+    LockWorkStation();
+    return TRUE;
 }

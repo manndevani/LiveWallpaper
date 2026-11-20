@@ -14,7 +14,6 @@
 #include "settings.h"
 #include "lock.h"
 
-#define SAVER_CLASS APP L"_saver"
 #define MOVE_PX 10     /* mouse movement that ends the screen saver */
 #define GRACE_MS 600   /* ignore movement and keys right after starting (the Preview click, the shortcut keys) */
 

@@ -36,6 +36,7 @@ static struct {
     HWND icons; /* icon layer we stay directly under (24H2+) */
     HICON icon;
     UINT wm_taskbar, wm_reload, wm_status, wm_pause;
+    UINT lock_waited; /* ms since the lock shortcut started the screen saver */
 
     const Source *src;
     SourceInfo info;
@@ -591,13 +592,16 @@ static LRESULT CALLBACK msg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
     }
     switch (m) {
     case WM_HOTKEY:
-        if (w == 1 && lock_now())
-            SetTimer(h, 2, 1500, NULL);
+        if (w == 1 && lock_now()) {
+            e.lock_waited = 0;
+            SetTimer(h, 2, 500, NULL);
+        }
         return 0;
     case WM_TIMER:
         if (w == 2) {
-            KillTimer(h, 2);
-            lock_check();
+            e.lock_waited += 500;
+            if (lock_check(e.lock_waited))
+                KillTimer(h, 2);
             return 0;
         }
         poll();
