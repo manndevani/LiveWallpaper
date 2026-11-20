@@ -36,6 +36,7 @@ void lock_refresh(void);
    every 100 ms until it returns TRUE. */
 BOOL lock_now(void);
 BOOL lock_check(UINT waited_ms);
+void lock_note_locked(void); /* the engine calls it on every WTS_SESSION_LOCK */
 #define SAVER_CLASS APP L"_saver" /* the screen saver's window */
 #define LOCK_EVENT L"Local\\livewall_lock_shortcut" /* set: the screen saver came from the shortcut */
 #define LOCK_HOTKEY_MODS (MOD_CONTROL | MOD_ALT)

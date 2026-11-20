@@ -137,10 +137,10 @@ void lock_refresh(void)
 }
 
 /* The lock shortcut. Asks Windows to start the screen saver now, the same
-   way it does after the idle time, so Windows itself watches it and locks
-   the PC when it ends; lock_check() also locks it the moment the screen saver
-   closes, even inside Windows' grace period. Without livewall's screen saver,
-   it simply locks. */
+   way it does after the idle time, so Windows itself runs it on its locked
+   screen-saver desktop and locks the PC when it ends (see finish() in
+   saver.c). As a backup, lock_check() locks it if Windows hasn't. Without
+   livewall's screen saver, it simply locks. */
 static HANDLE g_shortcut; /* LOCK_EVENT */
 
 BOOL lock_now(void)
@@ -168,16 +168,23 @@ BOOL lock_now(void)
    thread touches it: the previous one is released when the next is made. */
 static HANDLE g_wait;
 
-/* Runs on a thread-pool thread the moment the screen saver process ends.
-   Windows skips the password if a screen saver ends within its grace period
-   (ScreenSaverGracePeriod, 5 s by default). That suits an idle start, not a
-   lock shortcut, so lock here whatever Windows decided. Locking an already
-   locked PC does nothing. */
+static volatile LONG g_locks;    /* WTS_SESSION_LOCK count, from the engine thread */
+static LONG g_locks_at_start;     /* g_locks when the shortcut's screen saver showed */
+
+void lock_note_locked(void) { InterlockedIncrement(&g_locks); }
+
+/* Backup, on a thread-pool thread once the shortcut's screen saver process
+   ends. Windows normally locks the PC by itself at that moment (the screen
+   saver keeps itself up through the grace period). If Windows hasn't locked
+   2 s later, something went wrong: lock now. Comparing lock counts, not
+   "is it locked now", means a quick unlock (Windows Hello) is never undone. */
 static VOID CALLBACK saver_ended(PVOID process, BOOLEAN timed_out)
 {
     (void)timed_out;
-    LockWorkStation(); /* no log here: log_line isn't thread-safe; the engine logs the lock */
     CloseHandle((HANDLE)process);
+    Sleep(2000);
+    if (InterlockedCompareExchange(&g_locks, 0, 0) == g_locks_at_start)
+        LockWorkStation(); /* no log here: log_line isn't thread-safe */
 }
 
 /* The running livewall.scr started by Windows. Windows runs screen savers on
@@ -216,6 +223,7 @@ BOOL lock_check(UINT waited_ms)
             UnregisterWait(g_wait);
             g_wait = NULL;
         }
+        g_locks_at_start = InterlockedCompareExchange(&g_locks, 0, 0);
         if (RegisterWaitForSingleObject(&g_wait, p, saver_ended, p, INFINITE, WT_EXECUTEONLYONCE)) {
             log_line(L"lock shortcut: screen saver showing within %u ms", waited_ms);
             return TRUE;
