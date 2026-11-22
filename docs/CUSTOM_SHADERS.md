@@ -29,7 +29,7 @@ Still to change by hand: `texture()` and iChannels (not supported), `const` arra
 - **Keep it cheap.** It runs behind your work all day. Avoid long loops and raymarching with many steps.
 - **Keep it dim.** Icons and text need to stay readable on top. Multiplying the final color by 0.3–0.5 usually helps.
 - The output is clamped to 0..1, and alpha is ignored.
-- If the shader doesn't compile, livewall shows the default wallpaper instead. The compiler error is written to `%APPDATA%\livewall\livewall.log`; open it with **Open folder** in the settings window.
+- If the shader doesn't compile, livewall shows the default wallpaper instead, and the bottom line of the settings window says why, with the line number (for example `line 3: undeclared identifier 'wobble'`). Fix the file, then click back into the settings window to check it again. The full compiler output is in `%APPDATA%\livewall\livewall.log` (**Open folder**).
 - Shaders are compiled with `ps_4_0`, so any GPU since about 2008 works.
 
 ## Sharing it

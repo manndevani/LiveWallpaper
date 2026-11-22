@@ -21,7 +21,7 @@
 
 | The numbers | What they mean |
 |---|---|
-| 🪶 **146 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
+| 🪶 **148 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
 | 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
 | 💤 **0% GPU** | When a window covers the desktop, it stops completely and uses no graphics power. |
 | ⚡ **~0.1% CPU** | Barely touches your processor. The graphics card does the work. |

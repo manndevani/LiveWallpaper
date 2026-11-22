@@ -46,11 +46,11 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 | `desktop.c/.h` | Getting behind the icons (both Explorer layouts); "is the desktop fully covered"; "is the cursor over the desktop" |
 | `gfx.c/.h` | D3D11 device on the chosen adapter, swap chain, constants, fullscreen draw, brightness dim pass |
 | `source.h` | `Source` vtable: `open / close / draw / play / failed / park` + `SourceInfo` |
-| `src_shader.c` | Built-in shaders (bytecode embedded at build time); custom `.hlsl` files compiled at load with `d3dcompiler_47.dll`, which is freed right after |
+| `src_shader.c` | Built-in shaders (bytecode embedded at build time); custom `.hlsl` files compiled at load with `d3dcompiler_47.dll`, which is freed right after. `shader_problem()` turns a compiler error into a short sentence for the settings footer |
 | `src_video.c` | `IMFMediaEngine` + DXGI device manager; `TransferVideoFrame` straight into the back buffer |
 | `src_image.c` | WIC still images (one immutable texture) and animated GIFs (CPU compositing into a dynamic texture) |
 | `still.c/.h` | Hands still pictures to the Windows wallpaper (zero-cost mode) |
-| `preview.c/.h` | Offscreen rendering through the same sources: settings thumbnails and `-snapshot` |
+| `preview.c/.h` | Offscreen rendering through the same sources: settings thumbnails, `-snapshot`, `-check` and the lock screen picture. Videos jump to the requested time first (or a third of the way into a shorter video), so a fade-in from black still gives a picture |
 | `engine.c/.h` | Message loop, tray menu, scheduling, pause logic, recovery |
 | `lock.c/.h` | Turning livewall's screen saver on and off in Windows, keeping the `.scr` copy up to date |
 | `saver.c` | The screen saver window and its draw loop (same sources as the engine) |
@@ -77,7 +77,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
   - After 10 s, a source with `park()` (video) frees its decoder. On resume it reopens at the same position.
 - **Still pictures** never get a device: `still.c` hands them to Windows (`IDesktopWallpaper`, with a dimmed copy when brightness < 100%). The engine then keeps only its tray icon. If Windows refuses, the engine draws the picture itself.
 - **Device loss / GPU switch** → `recover()` rebuilds the device and reopens the source.
-- **No GPU driver** (some virtual machines, a missing or broken driver) → `gfx_init` falls back to Direct3D's CPU renderer (WARP). `gfx.software` is set (also for the "Microsoft Basic Render Driver"), and Auto resolution then aims at 640×360 instead of 2560×1600. Build with `-DLW_FORCE_WARP=1` to test it on a normal PC.
+- **No GPU driver** (some virtual machines, a missing or broken driver) → `gfx_init` falls back to Direct3D's CPU renderer (WARP). `gfx.software` is set (also for the "Microsoft Basic Render Driver"), and Auto resolution then aims at 640×360 instead of 2560×1600. Build with `-DLW_FORCE_WARP=1` to test it on a normal PC. Other test builds: `-DLW_TEST_NO_GALLERY=1` (the gallery never answers, as when offline) and `-DLW_TEST_LIGHT=1` (light theme in Settings). From a shell, `set CL=/DLW_TEST_LIGHT=1` before `build.bat`.
 - The process runs at BELOW_NORMAL priority with EcoQoS (power throttling) on, from the moment the wallpaper is first on the desktop. Before that (at sign-in) it runs at normal priority and checks for the desktop every 100 ms instead of 500 ms, for at most 60 s, so a busy sign-in doesn't hold it back. The log line "on the desktop N ms after start" shows where the start-up time went.
 
 ## Rendering

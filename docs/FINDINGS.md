@@ -124,7 +124,9 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 
 - When livewall is launched from inside a packaged (MSIX) app, such as a terminal hosted by a Store-packaged app, Windows redirects its `%APPDATA%` writes to `%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\`. That folder is invisible to Explorer and to the same exe launched normally.
 - Result: `IDesktopWallpaper::SetWallpaper` on a file in our AppData fails with `0x80070002` (file not found). `still.c` retries with a copy in `%TEMP%`, which is not redirected.
-- It also means the config used during development sessions is not the one the sign-in task will read. Confirmed 2026-11-20: after a reboot the real `%APPDATA%ivewall` had no config yet, so the sign-in start acted as a first run and opened the settings window. Since then the task runs `livewall.exe -startup`, which never opens a window.
+- It also means the config used during development sessions is not the one the sign-in task will read. Confirmed 2026-11-20: after a reboot the real `%APPDATA%\livewall` had no config yet, so the sign-in start acted as a first run and opened the settings window. Since then the task runs `livewall.exe -startup`, which never opens a window.
+- The redirection only applies to files the packaged process creates. Writing to a file that already exists in the real `%APPDATA%` changes the real file (2026-11-22: a `WritePrivateProfileString` from a packaged shell to `%APPDATA%\livewall\config.ini` changed the user's real config). Test with a config path in the scratchpad, never the AppData one.
+- Testing from PowerShell: `FindWindowW("livewall_engine", $null)` finds nothing, because PowerShell passes `$null` to a string parameter as `""`, which asks for a window with an empty title. Use `[NullString]::Value`.
 
 - "GPU time" is the sum of `\GPU Engine(pid_*)\Running Time` across all engines. For video that includes the decode and video-processor engines.
 - Shader cost is almost the same whichever shader is used. Present and composition dominate, not the pixel shader.

@@ -33,7 +33,11 @@ Last updated: 2026-11-22
   - Released in v0.1.1.
 - [x] Animated preview in the README (`docs/images/preview.gif`, 2026-11-20): five built-ins at 2× speed, made from `-snapshot` frames. An MP4 version for posts is made the same way (not in the repo).
 - [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
-- [x] Community tab in Settings (2026-11-22, `gallery.c`): lists the gallery from GitHub Pages with previews; one click downloads, checks the SHA-256 and applies. Verified with Settings opened from the engine (real `%APPDATA%`): "gallery: 2 wallpapers listed", "gallery: soft-waves installed", file saved under `gallery\soft-waves\`, the engine showed it, the card got the green dot; switching back to Aurora worked. Shows "Couldn't reach the gallery" with Try again when offline (not yet tested by unplugging). Not yet clicked: installing from the Lock screen tab. Not in a release yet (after 0.2.1).
+- [x] Community tab in Settings (2026-11-22, `gallery.c`): lists the gallery from GitHub Pages with previews; one click downloads, checks the SHA-256 and applies. Verified with Settings using the real `%APPDATA%`: listing; install to the desktop (file saved under `gallery\soft-waves\`, the engine showed it, green dot); install from the Lock screen tab (sets only the lock wallpaper); "Couldn't reach the gallery" plus Try again (test build with `-DLW_TEST_NO_GALLERY=1`, both attempts logged). A thumbnail that failed before its file was installed is rebuilt after the install. Not in a release yet (after 0.2.1).
+- [x] Gallery checks with a video (2026-11-22, run locally: `prepare.sh` in WSL with a stand-in for ClamAV, then `check.ps1` and `build-index.ps1`): ffmpeg's copy drops the sound track, the title and the GPS location; the check passes it as a video; index.json lists it, and the published file is the rebuilt copy.
+- [x] Video previews no longer use the first frame (2026-11-22): `-snapshot`, `-check` and the "Same picture on lock screen" picture jump to the requested time, or a third of the way into shorter videos. Before, a video that fades in from black was judged blank by `-check`, so the gallery would have refused it; now a 12 s fade-in is pictured at 4 s and passes.
+- [x] Custom shader errors in Settings (2026-11-22): the footer says why the chosen `.hlsl` can't be shown, e.g. "broken.hlsl can't be shown: line 3: undeclared identifier 'wobble'", that it has no mainImage function, or that the file is missing. Settings compiles the file itself (once per file, and again when the window is brought back), so it shows even while the engine is paused. Checked with three broken files.
+- [x] Light theme of the settings window (2026-11-22, test build with `-DLW_TEST_LIGHT=1`): the library, Community and Lock screen views were captured and look right.
 
 ## Lock screen on Windows (screen saver, 2026-11-20)
 
@@ -82,7 +86,6 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 - [ ] Interactive shaders reacting to the real mouse and clicks on the desktop. The shaders render with a simulated cursor, but live input has not been checked by eye.
 - [ ] Tray menu: switching wallpapers, Add, Pause, Start with Windows, Exit. The code path is shared with the settings window, but the menu itself has not been clicked.
 - [ ] The hover ✕ that removes a library item. Can't be shown with synthetic mouse messages, because `TrackMouseEvent` sends `WM_MOUSELEAVE` at once.
-- [ ] Light theme of the settings window. Only dark mode was captured.
 - [ ] Per-monitor DPI change (moving the settings window to a monitor with different scaling).
 - [ ] Explorer restart while running: worked in v1, not re-tested after the refactor.
 - [ ] Pause on battery, display off and session lock: worked in v1, not re-tested.
@@ -99,7 +102,7 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 - No audio, by design. No web/HTML wallpapers.
 - Choosing a still picture **changes the Windows wallpaper setting**: that is how it costs nothing. The previous Windows wallpaper is not restored when you switch away. It is hidden behind the live one, and shows again only if livewall exits.
 - Settings for a still picture (fit and brightness) are applied by Windows. The cover/contain/stretch modes map to Fill/Fit/Stretch.
-- Custom shader errors only go to `livewall.log`. The UI shows the "could not show" fallback but not the compiler message.
+- The tray menu has still not been clicked by hand (2026-11-22): a right-click sent from a script didn't show the menu, probably because Windows only lets the program the user last clicked bring a menu to the front.
 
 ## Ideas / next
 
@@ -110,7 +113,6 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
   - macOS: a `.saver` plus "Require password";
   - iOS: export a video or Live Photo only.
 
-- Show shader compile errors in the settings inspector.
 - Per-monitor wallpapers (one swap chain per monitor).
 - Reduce video cost: decode at the source size and let DWM scale, as the shaders do.
 - An installer or "copy to %LOCALAPPDATA%" option so the task doesn't point into a build folder.
