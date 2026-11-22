@@ -110,6 +110,8 @@ BOOL preview_render(const WCHAR *id, UINT w, UINT h, double at, BYTE *bgra)
         /* Video needs a moment to decode its first frame. A forced draw
            before that copies black, so wait for a real frame (up to 3 s). */
         BOOL wait_frame = kind_of(id) == KIND_VIDEO;
+        if (wait_frame)
+            video_preview_seek(at);
         for (i = 0; i < 100 && !ok; i++) {
             ok = s->draw(&f, !wait_frame || i == 99);
             if (!ok)

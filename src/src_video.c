@@ -184,6 +184,25 @@ static BOOL v_draw(const FrameInfo *f, BOOL force)
 
 static BOOL v_failed(void) { return broken != 0; }
 
+void video_preview_seek(double at)
+{
+    double len;
+    int i;
+    for (i = 0; i < 100 && eng && IMFMediaEngine_GetReadyState(eng) < MF_MEDIA_ENGINE_READY_HAVE_METADATA; i++)
+        Sleep(30);
+    if (!eng)
+        return;
+    len = IMFMediaEngine_GetDuration(eng);
+    if (!(len > 0)) /* unknown (NaN) */
+        return;
+    if (at > len / 3)
+        at = len / 3;
+    if (FAILED(IMFMediaEngine_SetCurrentTime(eng, at)))
+        return;
+    for (i = 0; i < 100 && IMFMediaEngine_IsSeeking(eng); i++)
+        Sleep(30);
+}
+
 /* Parking closes the whole Media Foundation pipeline (tens of MB and a
    dozen threads) while the video is paused for a long time. The swap chain
    keeps showing the last frame, so nothing visible changes. */

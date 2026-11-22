@@ -26,6 +26,11 @@ typedef struct Source {
 
 extern const Source src_shader, src_video, src_image;
 
+/* Previews only: moves the open video to `at` seconds, or a third of the way
+   in if it is shorter, so a video that starts from black still gives a real
+   picture. Waits (up to ~3 s) for the length to be known and the jump done. */
+void video_preview_seek(double at);
+
 static __inline const Source *source_for(Kind k)
 {
     if (k == KIND_VIDEO)
