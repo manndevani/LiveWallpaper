@@ -42,6 +42,9 @@ static struct {
     SourceInfo info;
     BOOL error; /* the chosen wallpaper failed, a built-in is showing */
     BOOL lost;  /* GPU device lost; rebuild at the next safe point */
+    UINT losses;                /* device losses in a row while showing lost_for */
+    DWORD lost_tick;
+    WCHAR lost_for[MAX_PATH];
     BOOL still; /* a still picture was handed to Windows: no device, no window */
 
     BOOL parked;            /* the source freed its decoder during a long pause */
@@ -160,6 +163,13 @@ static void render(BOOL advance, BOOL force)
         HRESULT hr;
         gfx_dim(1.0f - cfg.brightness / 100.0f);
         hr = gfx_present();
+#ifdef LW_TEST_LOST
+        { /* pretend the GPU was reset every 90 frames */
+            static UINT n;
+            if (++n % 90 == 0)
+                hr = DXGI_ERROR_DEVICE_REMOVED;
+        }
+#endif
         if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
             e.lost = TRUE;
         else
@@ -326,6 +336,11 @@ static void load_source(BOOL fallback)
     source_fit = cfg.fit;
     source_speed = cfg.speed / 100.0f;
 
+    /* A wallpaper that made Windows reset the graphics card twice (a shader
+       too heavy for this GPU) isn't loaded again: each reset freezes the
+       screen for a few seconds, and Windows may block GPU use after many. */
+    if (e.losses >= 2 && str_ieq(id, e.lost_for))
+        fallback = TRUE;
     if (!fallback && k == KIND_IMAGE && go_still())
         return;
     e.still = FALSE;
@@ -369,8 +384,18 @@ static void load_source(BOOL fallback)
 /* Rebuild the device after a GPU reset or when switching GPUs. */
 static void recover(void)
 {
+    DWORD t = GetTickCount();
     log_line(L"rebuilding the graphics device");
     e.lost = FALSE;
+    if (!str_ieq(e.lost_for, cfg.current) || t - e.lost_tick > 120000) {
+        str_copy(e.lost_for, cfg.current, MAX_PATH);
+        e.losses = 0;
+    }
+    e.lost_tick = t;
+    if (++e.losses == 2)
+        log_line(L"the graphics card was reset twice in 2 minutes while showing %s; it won't be shown again "
+                 L"until livewall restarts",
+                 cfg.current);
     if (e.src) {
         e.src->close();
         e.parked = FALSE;
