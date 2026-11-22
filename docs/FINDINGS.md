@@ -134,7 +134,7 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
   - The Media Foundation pipeline adds ~45 MB and ~10 threads.
   - `TransferVideoFrame` color-converts and scales every frame to the full back buffer. Since 2026-11-22 it skips the scaling for a video smaller than the screen; see below.
   - It is still small next to any browser tab, and it pauses like everything else.
-- **Where video time goes on the graphics card** (2026-11-22, generated H.264 test files, 1920×1080, engine on the Intel GPU). Split by engine type from `\GPU Engine(pid_*_engtype_*)\Running Time`:
+- **Where video time goes on the graphics card** (2026-11-22, generated H.264 test files, 1920×1080, engine on the NVIDIA RTX A3000, which drives the screen; earlier versions of this note said Intel, which was wrong). Split by engine type from `\GPU Engine(pid_*_engtype_*)\Running Time`:
   - The `videodecode` engine takes 230–600 ms per second, and the `3d` engine (colour conversion, scaling, present) takes 90–150 ms per second.
   - Decoding is the larger part, and only the file decides it. The numbers jump between runs because the card changes its own clock, so compare builds in alternating runs.
   - 720p drawn into a 1280×720 buffer instead of a 1920×1080 one: 3d time 133–135 → 79–85 ms/s.
@@ -168,7 +168,7 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 - From PowerShell, `cmd /c build.bat` can fail with "not recognized" even after `cd`: cmd starts in the process's current folder, not PowerShell's location. Use the full path.
 - **A packaged shell also *reads* a redirected copy.** Once a packaged process has created `%APPDATA%\livewall\livewall.log`, that shell sees its own copy in `%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\` from then on. It looked as if the real engine had stopped logging. Ask the engine itself (`livewall.status`) instead of reading its log from such a shell.
 
-## Sandboxed video helper (2026-11-22, same machine, 1920×1080, engine and helper on the Intel GPU)
+## Sandboxed video helper (2026-11-22, same machine, 1920×1080, engine and helper on the NVIDIA RTX A3000 (LUID 0x1438c; this heading said Intel at first, which was wrong))
 
 - **AppContainer start-up.**
   - A process can't be started in an AppContainer that is only derived from a name (`DeriveAppContainerSidFromAppContainerName`). It has to be registered once with `CreateAppContainerProfile`, which makes `%LOCALAPPDATA%\Packages\livewall.decoder`.
@@ -194,7 +194,33 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 | 4K 60 fps (cap 30), helper | 1.7 + 9.4 MB | 1.4% | 15 + 18 |
 
 - The helper hands its memory back 5 s into playing, as the engine does: from 44.5 MB to ~10 MB.
-- **4K 60 fps keeps the Intel UHD's video decoder 82–86% busy**, with or without the helper. That is the limit of this chip, not of livewall. 4K 30 fps takes ~50%.
+- **4K 60 fps keeps the RTX A3000's video decoder 82–86% busy** (the `videodecode` engine), with or without the helper. 4K 30 fps takes ~50%. Not yet measured on the Intel UHD (`integrated_gpu=1`).
+
+## Where memory still goes (2026-11-23, same machine, 1920×1080)
+
+Measured after the 5 s trim. "Graphics memory" is `\GPU Process Memory(pid_*)\Dedicated Usage` and `Shared Usage`, per chip. Task Manager's Memory column doesn't include it. On an integrated chip the shared part is ordinary RAM.
+
+| | Private WS | Commit | Graphics memory |
+|---|---|---|---|
+| Engine, shader, default (NVIDIA) | 1.8 MB | 103 MB | 25 card + 17 shared (NVIDIA) + 19 shared (Intel) |
+| Engine, any wallpaper, `integrated_gpu=1` | 0.8 MB | 27 MB | 33 shared (Intel), nothing on NVIDIA; 6 threads instead of 16 |
+| Helper, 1080p 30 fps (NVIDIA) | 10.3 MB | 92 MB | 84 card + 22 shared |
+| Helper, 4K 30 fps (NVIDIA) | 9–21 MB | 158 MB | **292 card + 62 shared** |
+| Helper, 4K 30 fps, `integrated_gpu=1` | 18 MB | 146 MB | **343 shared = RAM** |
+
+- **The engine is at the floor.** A ten-line test program with only a D3D11 device on the NVIDIA adapter and one 1920×1080 flip swap chain shows the same 25.2 + 16.7 + 18.7 MB. The 18.7 MB on the Intel chip, and the Intel driver DLL being loaded, come from creating *any* swap chain on this hybrid laptop. An HWND swap chain and a DirectComposition one behave the same. This is DXGI's doing, not livewall's.
+- **The video decoder's frames are the big part.** Decoding the same files with a source reader (`MF_SOURCE_READER_D3D_MANAGER`, NV12 out, one frame held at a time) instead of the media engine:
+
+| | Media engine (now) | Source reader | + `MF_LOW_LATENCY` |
+|---|---|---|---|
+| 4K 30 fps | 292 + 62 MB | 140 + 142 MB | **128 + 21 MB** |
+| 1080p 30 fps | 84 + 22 MB | 43 + 37 MB | **40 + 18 MB** |
+
+  - The decoder's surfaces come back as one texture array (one distinct texture).
+  - Setting `MF_SA_MINIMUM_OUTPUT_SAMPLE_COUNT` to 4 on the decoder's output changed nothing.
+  - `MF_LOW_LATENCY` on the reader is what removes the shared part.
+  - Telling the media engine to output NV12 instead of BGRA (`MF_MEDIA_ENGINE_VIDEO_OUTPUT_FORMAT`) changed nothing, to the byte. The extra ~150 MB is inside the media engine, and no attribute reaches it.
+  - So a helper built on the source reader plus `ID3D11VideoProcessor` (for colour conversion, scaling and the fit) would save roughly 200 MB of graphics memory per 4K video and ~45 MB per 1080p one. The media engine does several things for free that the source reader would leave to us: pacing, looping, playback speed, rotation of phone videos (`MF_MT_VIDEO_ROTATION`), format changes mid-stream, padded surfaces (display aperture), and 10-bit HDR (P010).
 
 ## Linux port (2026-11-20, tested in WSL2 Ubuntu 26.04, Mesa llvmpipe, no GPU)
 
