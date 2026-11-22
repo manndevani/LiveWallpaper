@@ -48,13 +48,21 @@ Last updated: 2026-11-22
     - The Settings footer then says so in amber: "lowered: this shader is heavy for your graphics card". The level resets when another wallpaper is chosen.
     - Checked with made-up test shaders. One at 27% busy was left alone. One at 98% busy (16 fps) went to half resolution and settled at 46% busy, 28 fps.
     - Built-ins cost far less: Aurora takes 0.06 ms per frame.
+  - Drag and drop onto Settings adds files to the library (a folder and a `.txt` were skipped, a shader and a video added). Checked with a test build that fakes the drop (`-DLW_TEST_DROP=1`); **not yet dragged by hand** from File Explorer.
 - [x] Cheaper video drawing (2026-11-22). Checked with generated test videos on the 1920×1080 screen, old build against new, two runs each:
   - A video smaller than the screen gets a buffer at its own size, and Windows stretches it, as with half-resolution shaders. A 720p video draws into 1280×720, and the drawing time on the graphics card falls from 133–135 to 79–85 ms per second.
   - Videos follow the frame cap. A 60 fps video with the cap at 30 now shows 29 fps instead of 59, and its drawing time falls from 87–94 to 39 ms per second.
   - Decoding costs the same as before; the file decides that.
   - Buffer sizes checked for every fit mode: 720p is 1280×720 in all three. A 4:3 640×480 video is 640×360 when it fills the screen and 853×480 with black bars. Going back to a shader returns to 1920×1080, and `-snapshot` of a video still works.
   - Not yet looked at on the real desktop by eye. Windows' stretch is a simple one, so a small video may look a little softer than before.
-  - Drag and drop onto Settings adds files to the library (a folder and a `.txt` were skipped, a shader and a video added). Checked with a test build that fakes the drop (`-DLW_TEST_DROP=1`); **not yet dragged by hand** from File Explorer.
+- [x] Videos decoded in a sandboxed helper process (2026-11-22): `livewall.exe -decode`, see ARCHITECTURE.md and SAFETY.md. Checked with generated test videos:
+  - The helper's token: AppContainer, low integrity, no capabilities, in a job.
+  - A test build (`-DLW_TEST_SANDBOX=1`) has the helper try to read livewall's config.ini, list the Documents folder and connect to 1.1.1.1:443. All three were refused (5, 5, 10013).
+  - 1080p, 720p, 4:3, 4K 30 and 4K 60 fps all play. The fit modes give the same buffer sizes as before. `-snapshot` gives the same picture byte for byte. `-check` passes a 4K video and fails a broken file.
+  - Paused for 13 s, the helper is closed and the engine is at 0.2 MB. On resume a new helper starts and playback goes on.
+  - A broken `.mp4` is reported ("broken.mp4 failed while playing (0xC00D36C4)") and a built-in is shown instead.
+  - Costs: about the same graphics card time as decoding in the engine, and less memory (numbers in FINDINGS.md).
+  - **Not yet checked:** the screen saver with a video; the gallery's `-check` on GitHub's Windows machines (it will run on the next gallery change); whether playback resumes at the exact same point after a park (it is asked to); HEVC and AV1, which come from the Store and may not load inside the sandbox.
 
 ## Lock screen on Windows (screen saver, 2026-11-20)
 
@@ -127,7 +135,7 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 
 ## Ideas / next
 
-- From the safety review (details in [SAFETY.md](SAFETY.md)): decode untrusted files in a low-rights helper process; share wallpapers through an issue form instead of a pull request; accept `.glsl` on Windows; show names without `.hlsl`; measure Linux memory on a real graphics card.
+- From the safety review (details in [SAFETY.md](SAFETY.md)): decode pictures and GIFs in the sandboxed helper too (videos already are); share wallpapers through an issue form instead of a pull request; accept `.glsl` on Windows; show names without `.hlsl`; measure Linux memory on a real graphics card.
 
 - Other platforms: Android and macOS next. They will reuse `shaders/glsl/`.
 - Lock screen on the other platforms, always through the system's own lock (never a home-made password screen):

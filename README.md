@@ -103,7 +103,7 @@ After a moment paused, it gives its memory back to Windows (0.3 MB). Still pictu
 
 **Is there sound?** No. Video wallpapers are always muted.
 
-**Is it safe?** A wallpaper is only a picture, GIF, video or shader; livewall never runs a program that comes with one. It uses Windows' own decoders, which Windows Update keeps fixed, and it never sees your password. See [how livewall keeps your PC safe and light](docs/SAFETY.md).
+**Is it safe?** A wallpaper is only a picture, GIF, video or shader; livewall never runs a program that comes with one. It uses Windows' own decoders, which Windows Update keeps fixed. Videos are opened in a locked-down helper that can't read your files or use the internet. livewall never sees your password. See [how livewall keeps your PC safe and light](docs/SAFETY.md).
 
 **Does it send my data anywhere?** No. livewall only goes online when you open the **Community** tab, and then only to download the gallery list and the wallpapers you pick. It sends nothing about you.
 

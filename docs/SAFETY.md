@@ -26,7 +26,14 @@ A live wallpaper runs all day, opens files that other people made, and sits next
 - Gallery media is rebuilt by ffmpeg in the gallery's checks, so a crafted file sent to the gallery is not what people download.
 - Pictures larger than 8192 pixels on a side are scaled down, and a gallery file larger than 60 MB is refused.
 
-**Still open.** Your own files, and the decoding itself, are handled inside the wallpaper process with your normal user rights. Fix: decode untrusted files in a separate helper process with lowered rights (a "low integrity" process), so a decoder bug can't reach your files.
+- **New (2026-11-22): videos are decoded in a sandbox.** A separate helper process, started by livewall, decodes each video. Windows runs it in an "app container" with no permissions:
+  - it can't open your files or use the internet;
+  - it gets only the one video file livewall opened for it;
+  - it can't start other programs, it may use at most 1.5 GB of memory, and it ends when livewall does.
+  - A test build has the helper try what code taken over by a crafted file would try. Reading a file and listing the Documents folder were refused ("access denied"), and connecting to the internet was refused too.
+  - The frames stay on the graphics card, so a 4K video costs what it did before; see FINDINGS.md.
+
+**Still open.** Pictures and GIFs are still decoded inside the wallpaper process with your normal user rights. Fix: decode them in the same kind of helper.
 
 ### Shaders
 

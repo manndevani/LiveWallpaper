@@ -166,6 +166,35 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
   - At 50% busy for 5 seconds, only a really heavy shader trips it: 98% busy did, 27% didn't.
 - **A test engine started with `Start-Process` can outlive `Stop-Process $p`**. Stop it by name and wait. If the real engine starts while a test engine still has its window, the real one quits at once (only one engine runs at a time), and no wallpaper is left running.
 - From PowerShell, `cmd /c build.bat` can fail with "not recognized" even after `cd`: cmd starts in the process's current folder, not PowerShell's location. Use the full path.
+- **A packaged shell also *reads* a redirected copy.** Once a packaged process has created `%APPDATA%\livewall\livewall.log`, that shell sees its own copy in `%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\` from then on. It looked as if the real engine had stopped logging. Ask the engine itself (`livewall.status`) instead of reading its log from such a shell.
+
+## Sandboxed video helper (2026-11-22, same machine, 1920×1080, engine and helper on the Intel GPU)
+
+- **AppContainer start-up.**
+  - A process can't be started in an AppContainer that is only derived from a name (`DeriveAppContainerSidFromAppContainerName`). It has to be registered once with `CreateAppContainerProfile`, which makes `%LOCALAPPDATA%\Packages\livewall.decoder`.
+  - The exe did not need an extra permission, even when started from a folder in the user's profile (Temp). `sandbox.c` still grants the container read access to livewall.exe if `CreateProcess` ever says "access denied".
+- **Handles instead of names.** Handles given to the helper (inherited through `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, or duplicated into it) work even though the AppContainer couldn't open the same objects by name. This covers the file, the shared memory, the event, and the texture's NT handle.
+- **Media Foundation in an AppContainer.**
+  - H.264 decodes on the GPU inside the container.
+  - The media engine reads the file through `MFCreateMFByteStreamOnStream` over a hand-written `IStream` on the file handle. The URL passed to `SetSourceFromByteStream` only needs the right extension.
+  - A broken file fails with `0xC00D36C4` (unsupported byte stream).
+- **The keyed mutex costs copy-engine time.**
+  - Passing the shared texture between the processes keeps the GPU's copy engine busy for 80–110 ms per second at 30 fps (1080p texture), counted against the engine.
+  - This happens even when the engine takes the frame and draws nothing, so it is the hand-over itself, not our copy.
+  - Drawing the frame with a shader instead of `CopyResource` cost the same, so the plain copy stays.
+- **Cost, helper against decoding in the engine** (two runs each, alternating builds):
+
+| Video | Memory in use (engine + helper) | CPU | GPU 3d + copy (ms/s) |
+|---|---|---|---|
+| 1080p 30 fps, in the engine | 17.5–20.4 MB | 0.5% | 150 + 1 |
+| 1080p 30 fps, helper | 1.8 + 10.5 MB | 0.7% | 70–78 + 80–90 |
+| 4K 30 fps, in the engine | 69.5 MB | 0.55% | 57 + 0 |
+| 4K 30 fps, helper | 1.6 + 22.0 MB | 0.85% | 32 + 26 |
+| 4K 60 fps (cap 30), in the engine | 45.1 MB | 0.9% | 34 + 0 |
+| 4K 60 fps (cap 30), helper | 1.7 + 9.4 MB | 1.4% | 15 + 18 |
+
+- The helper hands its memory back 5 s into playing, as the engine does: from 44.5 MB to ~10 MB.
+- **4K 60 fps keeps the Intel UHD's video decoder 82–86% busy**, with or without the helper. That is the limit of this chip, not of livewall. 4K 30 fps takes ~50%.
 
 ## Linux port (2026-11-20, tested in WSL2 Ubuntu 26.04, Mesa llvmpipe, no GPU)
 

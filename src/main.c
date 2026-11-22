@@ -8,6 +8,7 @@
  *   livewall.exe -put-back-grace put back Windows' grace period (engine, on Exit)
  *   livewall.exe -snapshot <id> <out.png> [seconds]   render one frame to a PNG
  *   livewall.exe -check <file> <out.png>   the gallery's safety check (preview.c)
+ *   livewall.exe -decode ...     the sandboxed video helper, started by livewall itself (decoder.c)
  *   livewall.scr /s, /p <hwnd>, /c   the screen saver (see saver.c)
  *
  * Plain C, no C runtime: see util.c. */
@@ -18,6 +19,7 @@
 #include "preview.h"
 #include "autostart.h"
 #include "lock.h"
+#include "decoder.h"
 
 /* Copies the next (optionally quoted) argument into out; returns the rest. */
 static const WCHAR *next_arg(const WCHAR *s, WCHAR *out, int cap)
@@ -93,7 +95,9 @@ void __stdcall entry(void)
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     rest = next_arg(rest, arg, MAX_PATH);
 
-    if (is_flag(arg, L"quit")) {
+    if (is_flag(arg, DECODE_FLAG)) {
+        code = decoder_run(rest); /* first: the sandboxed helper does nothing else */
+    } else if (is_flag(arg, L"quit")) {
         engine_stop();
     } else if (is_flag(arg, L"settings")) {
         settings_run(SETTINGS_MAIN);

@@ -11,6 +11,7 @@
 | `livewall.exe -quit` | Stops the engine and waits until it has exited | instant |
 | `livewall.exe -snapshot <id> <out.png> [sec]` | Renders one frame offscreen (testing) | instant |
 | `livewall.exe -check <file> <out.png>` | The gallery's safety check: opens and draws a wallpaper file the way the engine does, saves the frame at 8 s, and writes `<out.png>.txt` (`ok`, `kind`, `us_per_frame` over 30 frames at 960x540, `blank`). Exit code 0 only if it drew. | a second or two |
+| `livewall.exe -decode <share> <kick> <parent>` | **Video helper** (`decoder.c`), started by whichever process shows a video (engine, screen saver, `-snapshot`, `-check`), never by hand. It runs sandboxed (`sandbox.c`): an AppContainer with no capabilities, low integrity, in a job (no child processes, 1.5 GB memory, ends with its parent). | while that video is open and not parked |
 | `livewall.scr /s`, `/p <hwnd>`, `/c` | **Screen saver** (`saver.c`): full screen, the preview in Windows' dialog, or settings on the Lock screen tab | while the PC is idle |
 
 The UI lives in a separate process so the engine never pays for Direct2D, DirectWrite, the shell or thumbnails.
@@ -46,8 +47,10 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 | `desktop.c/.h` | Getting behind the icons (both Explorer layouts); "is the desktop fully covered"; "is the cursor over the desktop" |
 | `gfx.c/.h` | D3D11 device on the chosen adapter, swap chain, constants, fullscreen draw, brightness dim pass |
 | `source.h` | `Source` vtable: `open / close / draw / play / failed / park` + `SourceInfo` |
+| `sandbox.c/.h` | Starts a copy of livewall.exe in the `livewall.decoder` AppContainer (registered once with `CreateAppContainerProfile`; this makes `%LOCALAPPDATA%\Packages\livewall.decoder`), with only the handles it is given, extension points, non-system fonts and remote images blocked, and in a job |
+| `decoder.c/.h` | The video helper. Shares one block of memory (`DecodeShare`) with the process that started it, plus an event to wake it. It reads the file through an `IStream` over the handle it was given, decodes with the Media Foundation media engine on the same graphics card (by LUID), and draws each frame, fitted, into a texture shared with an NT handle and a keyed mutex (key 1 = new frame, key 0 = taken). Neither side waits for the other. It writes no log; errors go into `DecodeShare` and the engine logs them. |
 | `src_shader.c` | Built-in shaders (bytecode embedded at build time); custom `.hlsl` files compiled at load with `d3dcompiler_47.dll`, which is freed right after. `shader_problem()` turns a compiler error into a short sentence for the settings footer |
-| `src_video.c` | `IMFMediaEngine` + DXGI device manager; `TransferVideoFrame` straight into the back buffer |
+| `src_video.c` | The engine side of video: opens the file, starts the helper (`decoder.c`) with that one handle, makes the shared texture at the back buffer size and copies each new frame into the back buffer on the card. Parking ends the helper; unparking starts a new one at the same position. Media Foundation is never loaded into the engine. |
 | `src_image.c` | WIC still images (one immutable texture) and animated GIFs (CPU compositing into a dynamic texture) |
 | `still.c/.h` | Hands still pictures to the Windows wallpaper (zero-cost mode) |
 | `preview.c/.h` | Offscreen rendering through the same sources: settings thumbnails, `-snapshot`, `-check` and the lock screen picture. Videos jump to the requested time first (or a third of the way into a shorter video), so a fade-in from black still gives a picture |
