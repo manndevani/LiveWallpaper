@@ -10,5 +10,5 @@ float4 ps_main(float4 pos : SV_Position) : SV_Target
     if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1)
         return float4(0, 0, 0, 1);
     float4 c = tex.Sample(samp, uv);
-    return float4(c.rgb, 1); // premultiplied, so transparent areas come out black
+    return float4(c.rgb * (1 - dim), 1); // brightness; premultiplied, so transparent areas come out black
 }

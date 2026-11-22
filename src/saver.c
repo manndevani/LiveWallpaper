@@ -140,6 +140,7 @@ static void render(BOOL force)
     f.time = v.anim;
     f.phase = phase_at(v.anim);
     f.click_age = 1.0e4f;
+    gfx.dimmed = FALSE;
     if (v.src->draw(&f, force)) {
         HRESULT hr;
         gfx_dim(1.0f - cfg.brightness / 100.0f);
@@ -161,6 +162,7 @@ static BOOL open_source(void)
     const WCHAR *id = cfg.lock[0] ? cfg.lock : cfg.current;
     Kind k = kind_of(id);
     source_fit = cfg.fit;
+    source_dim = 1.0f - cfg.brightness / 100.0f;
     source_speed = cfg.speed / 100.0f;
     source_fps = cfg.fps;
     memset(&v.info, 0, sizeof v.info);

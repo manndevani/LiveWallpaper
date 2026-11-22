@@ -42,6 +42,7 @@ typedef struct {
     UINT bw, bh;     /* back buffer size */
     UINT scale;
     UINT fix_w, fix_h; /* back buffer size a source asked for (gfx_content_size), 0 = none */
+    BOOL dimmed;       /* this frame was drawn with source_dim applied: gfx_dim has nothing to do */
     UINT ease;       /* extra resolution divider from the speed guard (0 or 1 = none) */
     double gpu_sum;  /* GPU seconds of the frames timed since the engine last reset it */
     UINT gpu_n;      /* how many frames that is */
@@ -50,6 +51,7 @@ typedef struct {
 
 extern Gfx gfx;
 extern Fit source_fit;     /* how images and video fill the screen */
+extern float source_dim;    /* brightness: 0 as is .. 1 black; shaders and images apply it as they draw */
 extern float source_speed; /* playback speed, 1 = normal */
 extern UINT source_fps;    /* the frame cap: videos show at most this many frames a second */
 

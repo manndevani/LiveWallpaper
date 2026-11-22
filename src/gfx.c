@@ -7,6 +7,7 @@
 
 Gfx gfx;
 Fit source_fit = FIT_COVER;
+float source_dim;
 
 /* Timestamp queries for gfx_time_*: a small ring, so results can be read a
    few frames later without stalling. Made once with the device. */
@@ -334,6 +335,9 @@ void gfx_consts(FrameConsts *c, const FrameInfo *f)
     c->res[0] = (float)gfx.bw;
     c->res[1] = (float)gfx.bh;
     c->phase = f->phase;
+    c->dim = source_dim; /* the shader applies brightness, so gfx_dim can skip its pass */
+    if (source_dim > 0.002f)
+        gfx.dimmed = TRUE;
     c->time = (float)t;
     c->mouse[0] = f->mouse[0];
     c->mouse[1] = f->mouse[1];
@@ -383,8 +387,8 @@ void gfx_dim(float amount)
 {
     static const float factor[4] = {0, 0, 0, 0};
     FrameConsts c;
-    if (amount <= 0.002f || !gfx.rtv)
-        return;
+    if (amount <= 0.002f || !gfx.rtv || gfx.dimmed)
+        return; /* nothing to do, or the shader already did it (only video needs this pass) */
     memset(&c, 0, sizeof c);
     c.res[0] = (float)gfx.bw;
     c.res[1] = (float)gfx.bh;

@@ -24,5 +24,5 @@ float4 ps_main(float4 pos : SV_Position) : SV_Target
 
     col *= 1.0 - 0.45 * dot(uv, uv); // soft vignette keeps icons readable
     col += dither(pos.xy);
-    return float4(saturate(col), 1);
+    return float4(saturate(col) * (1 - dim), 1); // brightness
 }

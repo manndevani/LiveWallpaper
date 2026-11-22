@@ -45,7 +45,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 | `ipc.c/.h` | Finding, querying, reloading, pausing, starting and stopping the engine from another process |
 | `autostart.c/.h` | Per-user logon task through `schtasks /Create /XML` |
 | `desktop.c/.h` | Getting behind the icons (both Explorer layouts); "is the desktop fully covered"; "is the cursor over the desktop" |
-| `gfx.c/.h` | D3D11 device on the chosen adapter, swap chain, constants, fullscreen draw, brightness dim pass |
+| `gfx.c/.h` | D3D11 device on the chosen adapter, swap chain, constants, fullscreen draw, brightness (dim pass for video) |
 | `source.h` | `Source` vtable: `open / close / draw / play / failed / park` + `SourceInfo` |
 | `sandbox.c/.h` | Starts a copy of livewall.exe in the `livewall.decoder` AppContainer (registered once with `CreateAppContainerProfile`; this makes `%LOCALAPPDATA%\Packages\livewall.decoder`), with only the handles it is given, extension points, non-system fonts and remote images blocked, and in a job |
 | `decoder.c/.h` | The video helper. Shares one block of memory (`DecodeShare`) with the process that started it, plus an event to wake it. It reads the file through an `IStream` over the handle it was given, decodes on the same graphics card (by LUID) and draws each frame, fitted, into a texture shared with an NT handle and a keyed mutex (key 1 = new frame, key 0 = taken). Neither side waits for the other. It writes no log; errors go into `DecodeShare` and the engine logs them. Two players behind one face (`p_*`): normally a Media Foundation source reader (low-latency, NV12 or P010 out) whose frames the card's video processor converts, scales, turns and letterboxes straight into the shared texture, with livewall's own clock for pacing, looping, speed and seeking; if that can't open the file or the card has no video processor, the media engine (about twice the graphics memory). |
@@ -94,7 +94,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
   - mouse, click and click age;
   - dim;
   - the fit transform.
-- Brightness is a second fullscreen pass with blend `dst × (1 − a)`.
+- Brightness: shaders, pictures and GIFs multiply their colour by `1 − dim` as they draw (`source_dim`, set from the config). Only video, which is copied rather than drawn, gets a second fullscreen pass with blend `dst × (1 − a)`; `gfx_dim` skips it when the frame was drawn already dimmed.
 - Fit (cover/contain/stretch) is a uv scale and offset computed by `gfx_fit`.
 
 ## Start at sign-in

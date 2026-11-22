@@ -167,6 +167,7 @@ static void render(BOOL advance, BOOL force)
 
     if (e.src == &src_shader)
         gfx_time_begin();
+    gfx.dimmed = FALSE;
     if (e.src->draw(&f, force)) {
         HRESULT hr;
         gfx_dim(1.0f - cfg.brightness / 100.0f);
@@ -345,6 +346,7 @@ static void load_source(BOOL fallback)
     e.error = FALSE;
     e.has_click = FALSE;
     source_fit = cfg.fit;
+    source_dim = 1.0f - cfg.brightness / 100.0f;
     source_speed = cfg.speed / 100.0f;
     source_fps = cfg.fps;
 
@@ -599,6 +601,7 @@ static void reload(void)
     config_load(&cfg);
     update_hotkey();
     source_fit = cfg.fit;
+    source_dim = 1.0f - cfg.brightness / 100.0f;
     source_speed = cfg.speed / 100.0f;
     source_fps = cfg.fps;
     if (e.still && str_ieq(prev, cfg.current)) {

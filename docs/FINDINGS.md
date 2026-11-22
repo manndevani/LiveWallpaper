@@ -178,6 +178,12 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
   - H.264 decodes on the GPU inside the container.
   - The media engine reads the file through `MFCreateMFByteStreamOnStream` over a hand-written `IStream` on the file handle. The URL passed to `SetSourceFromByteStream` only needs the right extension.
   - A broken file fails with `0xC00D36C4` (unsupported byte stream).
+- **Brightness inside the shaders (2026-11-23).** Below 100% brightness, a second fullscreen pass darkened every frame. Doing it in the shaders instead (multiply by `1 − dim`): Aurora at 60% on the Intel chip went from 86.8–90.6 to 76.2–77.8 ms of graphics time per second (four runs each), the same as at 100%. Full-brightness snapshots are identical to before; dimmed ones are 60% of the full picture within 1 level of 255. Video still uses the pass.
+- **Ideas from an outside review that measured no better (2026-11-23):**
+  - Creating the engine's device without `D3D11_CREATE_DEVICE_VIDEO_SUPPORT` (or with `SINGLETHREADED`): same memory, same 16 threads, and device creation took ~205 ms either way.
+  - A faster "is the desktop covered" check: it takes 0.5–1 ms twice a second (~0.1% of one core) and already stops at the first windows that cover everything.
+  - A counter so the engine skips `AcquireSync` when no new video frame is there: at most ~30 failed checks a second, far below what the measurements here can see. The copy-engine time it was meant to remove comes from presenting (next point).
+- **Correction (2026-11-23): not the keyed mutex.** A test engine showing Aurora, with no video at all, keeps the NVIDIA copy engine busy for the same ~100 ms per second; on the Intel chip (`integrated_gpu=1`) there is no copy at all. So the copy comes from presenting on this hybrid laptop (frames rendered on the NVIDIA card are copied for the display), not from the hand-over below.
 - **The keyed mutex costs copy-engine time.**
   - Passing the shared texture between the processes keeps the GPU's copy engine busy for 80–110 ms per second at 30 fps (1080p texture), counted against the engine.
   - This happens even when the engine takes the frame and draws nothing, so it is the hand-over itself, not our copy.

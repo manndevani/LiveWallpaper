@@ -31,5 +31,5 @@ float4 ps_main(float4 pos : SV_Position) : SV_Target
     }
 
     col += dither(pos.xy);
-    return float4(saturate(col), 1);
+    return float4(saturate(col) * (1 - dim), 1); // brightness
 }

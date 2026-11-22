@@ -21,9 +21,9 @@ float4 ps_main(float4 pos : SV_Position) : SV_Target
     float dotm = 1.0 - smoothstep(rad, rad + edge, d);
 
     float3 bg  = lerp(float3(0.035, 0.035, 0.06), float3(0.015, 0.015, 0.03), pos.y / res.y);
-    float3 dim = float3(0.22, 0.24, 0.34), lit = float3(0.50, 0.80, 1.00);
-    float3 col = bg + dotm * lerp(dim, lit, near) + lit * 0.05 * near;
+    float3 dull = float3(0.22, 0.24, 0.34), lit = float3(0.50, 0.80, 1.00);
+    float3 col = bg + dotm * lerp(dull, lit, near) + lit * 0.05 * near;
 
     col += dither(pos.xy);
-    return float4(saturate(col), 1);
+    return float4(saturate(col) * (1 - dim), 1); // brightness
 }

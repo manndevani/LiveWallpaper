@@ -44,7 +44,7 @@ static const char kSuffix[] =
     "\nfloat4 lw_main(float4 pos : SV_Position) : SV_Target {\n"
     "    float4 c = float4(0, 0, 0, 1);\n"
     "    mainImage(c, float2(pos.x, res.y - pos.y));\n"
-    "    return float4(saturate(c.rgb), 1.0);\n"
+    "    return float4(saturate(c.rgb) * (1.0 - dim), 1.0);\n"
     "}\n";
 
 typedef HRESULT(WINAPI *CompileFn)(LPCVOID, SIZE_T, LPCSTR, const D3D_SHADER_MACRO *, ID3DInclude *, LPCSTR, LPCSTR,
