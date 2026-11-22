@@ -3,6 +3,6 @@
 #pragma once
 
 #define LW_VERSION_MAJOR 0
-#define LW_VERSION_MINOR 2
-#define LW_VERSION_PATCH 1
-#define LW_VERSION_STR "0.2.1"
+#define LW_VERSION_MINOR 3
+#define LW_VERSION_PATCH 0
+#define LW_VERSION_STR "0.3.0"
