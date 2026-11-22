@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-20
+Last updated: 2026-11-22
 
 ## Done and verified on the user's PC (Windows 11 25H2, hybrid Intel + NVIDIA)
 
@@ -33,6 +33,7 @@ Last updated: 2026-11-20
   - Released in v0.1.1.
 - [x] Animated preview in the README (`docs/images/preview.gif`, 2026-11-20): five built-ins at 2× speed, made from `-snapshot` frames. An MP4 version for posts is made the same way (not in the repo).
 - [x] `livewall.exe` carries version info (product name `livewall`, version from `src/version.h`).
+- [x] Community tab in Settings (2026-11-22, `gallery.c`): lists the gallery from GitHub Pages with previews; one click downloads, checks the SHA-256 and applies. Verified with Settings opened from the engine (real `%APPDATA%`): "gallery: 2 wallpapers listed", "gallery: soft-waves installed", file saved under `gallery\soft-waves\`, the engine showed it, the card got the green dot; switching back to Aurora worked. Shows "Couldn't reach the gallery" with Try again when offline (not yet tested by unplugging). Not yet clicked: installing from the Lock screen tab. Not in a release yet (after 0.2.1).
 
 ## Lock screen on Windows (screen saver, 2026-11-20)
 
@@ -74,7 +75,7 @@ GitHub Actions (`.github/workflows/build.yml`) builds the Windows exe and the Li
 SignPath's conditions: the build must be verifiable from source, each signing needs manual approval, product name and version must be set, GitHub needs MFA, and the README needs a code signing policy, privacy statement and uninstall steps.
 
 ## Implemented but not yet verified
-- [ ] Wallpaper gallery (2026-11-22): separate repo https://github.com/manndevani/livewall-gallery (local copy at `C:\Projects\livewall-gallery`) with sharing rules, `tools/check.ps1` (uses `livewall.exe -check`), `tools/prepare.sh` (scope rule, ClamAV, ffmpeg rebuild), `tools/build-index.ps1` and the `gallery.yml` workflow (checks on pull requests, publishes to GitHub Pages from main). Checked on this PC: two example shaders pass; `#include`, a flat colour, a 28x-heavy shader, a stray .exe, bad info.json and bad folder names are refused; a fork PR touching README or using a folder name with `$(...)` is refused without running it. On GitHub (first push to main): the ClamAV scan, the check with livewall built from main (on WARP, no GPU) and the Pages publish all passed; https://manndevani.github.io/livewall-gallery/index.json lists both wallpapers and every file matches its SHA-256. Not yet seen on GitHub: a pull request, and a media file going through ffmpeg. The Community tab in Settings is the next step.
+- [ ] Wallpaper gallery (2026-11-22): separate repo https://github.com/manndevani/livewall-gallery (local copy at `C:\Projects\livewall-gallery`) with sharing rules, `tools/check.ps1` (uses `livewall.exe -check`), `tools/prepare.sh` (scope rule, ClamAV, ffmpeg rebuild), `tools/build-index.ps1` and the `gallery.yml` workflow (checks on pull requests, publishes to GitHub Pages from main). Checked on this PC: two example shaders pass; `#include`, a flat colour, a 28x-heavy shader, a stray .exe, bad info.json and bad folder names are refused; a fork PR touching README or using a folder name with `$(...)` is refused without running it. On GitHub (first push to main): the ClamAV scan, the check with livewall built from main (on WARP, no GPU) and the Pages publish all passed; https://manndevani.github.io/livewall-gallery/index.json lists both wallpapers and every file matches its SHA-256. Not yet seen on GitHub: a pull request, and a media file going through ffmpeg. Next: a gallery website, and likes through GitHub Discussions.
 - [x] Faster start at sign-in (2026-11-22): full speed and 100 ms checks until the wallpaper is on the desktop; the startup task is no longer re-registered at every sign-in (a bug), and housekeeping waits until the wallpaper shows. Warm start: 250–300 ms. Cold start (power-on): 4.7 s before the bug fix, 3.0 s after it (user, 2026-11-22). Most of the rest is the first Direct3D device.
 
 - [x] **Start after a reboot** (2026-11-20): the sign-in task started the engine 19 s after boot, and the wallpaper attached. That first boot opened the settings window, because the real config did not exist yet (see FINDINGS.md). Fixed with `-startup`: tested with no config at all through `schtasks /Run`, and no window appeared. A second sign-in start exits silently, and opening the exe by hand still shows settings.

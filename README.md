@@ -21,12 +21,12 @@
 
 | The numbers | What they mean |
 |---|---|
-| 🪶 **126 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
+| 🪶 **146 KB** | The whole app is one small file. Nothing to install, nothing extra to download, no account. |
 | 🧠 **~3 MB** | Memory while an animated wallpaper is playing. |
 | 💤 **0% GPU** | When a window covers the desktop, it stops completely and uses no graphics power. |
 | ⚡ **~0.1% CPU** | Barely touches your processor. The graphics card does the work. |
 | 🖥️ **Sharp** | Draws at your screen's own resolution. |
-| 🆓 **Free forever** | MIT-licensed, no ads, no tracking, no internet access. |
+| 🆓 **Free forever** | MIT-licensed, no ads, no tracking, no account. |
 
 <p align="center"><img src="docs/images/memory.svg" alt="livewall memory use: video 14 MB, settings window 3–4 MB, shader 3 MB, still picture 0.5 MB, paused 0.3 MB" width="760"></p>
 
@@ -54,6 +54,10 @@ Five animated wallpapers come built in, and they repeat smoothly with no visible
 <p align="center"><img src="docs/images/settings.png" alt="livewall settings window" width="640"></p>
 
 Click a wallpaper to apply it. Adjust speed, brightness, frame rate, resolution and fit. It follows your light/dark theme and accent color.
+
+## Community wallpapers
+
+The **Community** tab shows free wallpapers shared by other people in the [livewall gallery](https://github.com/manndevani/livewall-gallery). Click one to download it and use it, on the desktop or on the Lock screen tab. Each one is checked for viruses, tested and approved by a person before it shows up, and livewall checks every download's fingerprint (SHA-256) before using it. To share your own, see [how to add yours](https://github.com/manndevani/livewall-gallery/blob/main/SHARING.md).
 
 ## Lock screen
 
@@ -97,7 +101,7 @@ After a moment paused, it gives its memory back to Windows (0.3 MB). Still pictu
 
 **Is there sound?** No. Video wallpapers are always muted.
 
-**Does it send my data anywhere?** No. livewall never connects to the internet.
+**Does it send my data anywhere?** No. livewall only goes online when you open the **Community** tab, and then only to download the gallery list and the wallpapers you pick. It sends nothing about you.
 
 ## Coming next
 
@@ -148,7 +152,7 @@ The output is `build\livewall.exe`. Written in plain C on Direct3D 11, with no C
 <summary><b>What livewall changes on your PC, and how to uninstall</b></summary>
 
 - **Start with Windows** (on by default) adds a scheduled task named `livewall`.
-- Settings are stored in `%APPDATA%\livewall`.
+- Settings are stored in `%APPDATA%\livewall`, and wallpapers from the Community tab in its `gallery` folder.
 - Choosing a **still picture** sets it as your normal Windows wallpaper.
 - Only if you turn them on under **Lock screen**: **Show when idle** sets livewall as your Windows screen saver (a copy in `%LOCALAPPDATA%\livewall`), and **Same picture on lock screen** changes your Windows lock screen picture.
 
@@ -169,7 +173,9 @@ schtasks /Delete /TN livewall /F
 
 ## Privacy
 
-livewall does not connect to the internet. It does not transfer any information to other networked systems, and it collects no data.
+livewall collects no data and sends no information about you or your PC anywhere.
+
+It connects to the internet only when you open the **Community** tab in the settings. Then it downloads the gallery list and preview pictures from `manndevani.github.io` (GitHub Pages), and the wallpapers you click. These are ordinary downloads: like any website, GitHub can see your IP address. The wallpaper itself never goes online.
 
 ## Code signing policy
 

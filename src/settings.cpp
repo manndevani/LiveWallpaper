@@ -14,6 +14,7 @@
 #include "preview.h"
 #include "settings.h"
 #include "lock.h"
+#include "gallery.h"
 #include <d2d1.h>
 #include <dwrite.h>
 #include <dwmapi.h>
@@ -56,6 +57,8 @@ enum {
     ID_TAB = 100,     /* + 0 desktop, 1 lock screen */
     ID_LOCK_ON = 110, ID_LOCK_SAME, ID_LOCK_SECURE, ID_LOCK_PICTURE, ID_LOCK_PREVIEW, ID_LOCK_HOTKEY, ID_LOCK_GRACE,
     ID_LOCK_WAIT = 120, /* + index */
+    ID_GSHARE = 130, ID_GRETRY,
+    ID_GCARD = 3000,  /* + gallery index */
 };
 
 const WCHAR *const kTabLabel[] = {L"Desktop", L"Lock screen"};
@@ -67,12 +70,16 @@ const WCHAR *const kFpsLabel[] = {L"15", L"30", L"60"};
 const UINT kQuality[] = {0, 1, 2}; /* config scale: auto, full, half */
 const WCHAR *const kQualityLabel[] = {L"Auto", L"Full", L"Half"};
 const WCHAR *const kFitLabel[] = {L"Cover", L"Contain", L"Stretch"};
-const WCHAR *const kFilters[] = {L"All", L"Shaders", L"Interactive", L"Videos", L"Images"};
-const int FILTERS = 5;
+const WCHAR *const kFilters[] = {L"All", L"Shaders", L"Interactive", L"Videos", L"Images", L"Community"};
+const int FILTERS = 6;
+const int COMMUNITY = 5; /* the filter that shows the gallery */
 
 #define WM_APP_ADD (WM_APP + 1)
 #define WM_APP_THUMB (WM_APP + 2)
 #define WM_APP_LOCKTAB (WM_APP + 3)
+#define WM_APP_GINDEX (WM_APP + 4)   /* wParam: count or -1, lParam: GalleryItem array (copy it) */
+#define WM_APP_GPREVIEW (WM_APP + 5) /* wParam: index, lParam: ok */
+#define WM_APP_GINSTALL (WM_APP + 6) /* wParam: index, lParam: ok */
 
 struct Hit {
     D2D1_RECT_F r;
@@ -119,6 +126,19 @@ struct State {
     int tab;             /* 0 desktop, 1 lock screen */
     LockState lock;      /* Windows' screen saver settings */
     bool grace_zero;     /* Windows asks for the password with no 5 s grace period */
+
+    /* The Community gallery (gallery.c), filled by worker threads. */
+    int gstate;          /* 0 not loaded, 1 loading, 2 ready, 3 couldn't reach it */
+    GalleryItem gitems[GALLERY_MAX];
+    int gcount;
+    struct {
+        ID2D1Bitmap *bmp;
+        ID2D1BitmapBrush *brush;
+        bool ready;      /* the preview is downloaded and checked */
+        bool tried;      /* loaded into a bitmap (or failed to) */
+        bool failed;     /* the last install of this one failed */
+    } gview[GALLERY_MAX];
+    int ginstalling;     /* index being downloaded, -1 if none */
 } s;
 
 /* Like the engine: most of what Direct2D and the driver hold is needed only
@@ -473,6 +493,11 @@ void drop_thumbs()
         RELEASE(s.thumbs[i].bmp);
         s.thumbs[i].tried = false;
     }
+    for (int i = 0; i < GALLERY_MAX; i++) {
+        RELEASE(s.gview[i].brush);
+        RELEASE(s.gview[i].bmp);
+        s.gview[i].tried = false;
+    }
 }
 
 Thumb *thumb_for(const WCHAR *id)
@@ -589,9 +614,260 @@ void draw_filters()
     line(0, BAR - 0.5f, LEFT_W, BAR - 0.5f, s.th.line);
 }
 
+/* ---- community gallery ------------------------------------------------- */
+
+void para(const WCHAR *t, D2D1_RECT_F r, D2D1_COLOR_F c);
+void apply(bool start);
+
+/* Worker: downloads the list, hands a copy to the window, then fetches the
+   previews one by one. */
+DWORD WINAPI gallery_thread(LPVOID param)
+{
+    HWND hwnd = (HWND)param;
+    GalleryItem *items = (GalleryItem *)mem_alloc(sizeof(GalleryItem) * GALLERY_MAX);
+    int n = items ? gallery_fetch(items, GALLERY_MAX) : -1;
+    SendMessageW(hwnd, WM_APP_GINDEX, (WPARAM)n, (LPARAM)items); /* waits while the window copies it */
+    for (int i = 0; i < n; i++)
+        PostMessageW(hwnd, WM_APP_GPREVIEW, (WPARAM)i, gallery_preview(&items[i]));
+    mem_free(items);
+    return 0;
+}
+
+struct InstallJob {
+    HWND hwnd;
+    int index;
+    GalleryItem item;
+};
+
+DWORD WINAPI install_thread(LPVOID param)
+{
+    InstallJob *job = (InstallJob *)param;
+    BOOL ok = gallery_install(&job->item);
+    PostMessageW(job->hwnd, WM_APP_GINSTALL, (WPARAM)job->index, ok);
+    mem_free(job);
+    return 0;
+}
+
+void gallery_load()
+{
+    if (s.gstate == 1)
+        return;
+    s.gstate = 1;
+    HANDLE t = CreateThread(nullptr, 64 * 1024, gallery_thread, s.hwnd, 0, nullptr);
+    if (t)
+        CloseHandle(t);
+    else
+        s.gstate = 3;
+    invalidate();
+}
+
+/* Click on a gallery card: download it (unless it already is), then use it. */
+void gallery_pick(int i)
+{
+    if (i < 0 || i >= s.gcount || s.ginstalling >= 0)
+        return;
+    InstallJob *job = (InstallJob *)mem_alloc(sizeof(InstallJob));
+    if (!job)
+        return;
+    job->hwnd = s.hwnd;
+    job->index = i;
+    job->item = s.gitems[i];
+    s.ginstalling = i;
+    s.gview[i].failed = false;
+    HANDLE t = CreateThread(nullptr, 64 * 1024, install_thread, job, 0, nullptr);
+    if (t) {
+        CloseHandle(t);
+    } else {
+        mem_free(job);
+        s.ginstalling = -1;
+    }
+    invalidate();
+}
+
+void lock_changed();
+
+void gallery_installed(int i, bool ok)
+{
+    s.ginstalling = -1;
+    if (i < 0 || i >= s.gcount)
+        return;
+    WCHAR path[MAX_PATH];
+    gallery_local_path(&s.gitems[i], path);
+    log_line(L"gallery: %s %s", s.gitems[i].id, ok ? L"installed" : L"could not be downloaded or did not match");
+    if (!ok) {
+        s.gview[i].failed = true;
+        invalidate();
+        return;
+    }
+    bool have = false;
+    for (UINT k = 0; k < cfg.lib_count; k++)
+        if (str_ieq(cfg.lib[k], path))
+            have = true;
+    if (!have && !lib_add(&cfg, path)) {
+        MessageBoxW(s.hwnd, L"Your library is full. Remove a wallpaper you don't use, then try again.", L"livewall",
+                    MB_ICONINFORMATION);
+        return;
+    }
+    if (s.tab == 1) {
+        str_copy(cfg.lock, path, MAX_PATH);
+        lock_changed();
+    } else {
+        str_copy(cfg.current, path, MAX_PATH);
+        apply(true);
+    }
+}
+
+/* A checked preview picture, as a Direct2D bitmap. */
+ID2D1Bitmap *load_png(const WCHAR *path)
+{
+    IWICImagingFactory *wic = nullptr;
+    IWICBitmapDecoder *dec = nullptr;
+    IWICBitmapFrameDecode *frame = nullptr;
+    IWICFormatConverter *conv = nullptr;
+    ID2D1Bitmap *bmp = nullptr;
+    if (SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic))) &&
+        SUCCEEDED(wic->CreateDecoderFromFilename(path, nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &dec)) &&
+        SUCCEEDED(dec->GetFrame(0, &frame)) && SUCCEEDED(wic->CreateFormatConverter(&conv)) &&
+        SUCCEEDED(conv->Initialize(frame, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0,
+                                   WICBitmapPaletteTypeCustom)))
+        s.rt->CreateBitmapFromWicBitmap(conv, nullptr, &bmp);
+    RELEASE(conv);
+    RELEASE(frame);
+    RELEASE(dec);
+    RELEASE(wic);
+    return bmp;
+}
+
+const WCHAR *gallery_kind(const GalleryItem &g)
+{
+    return str_ieq(g.ext, L".hlsl") ? L"SHADER" : str_ieq(g.ext, L".mp4") ? L"VIDEO" : str_ieq(g.ext, L".gif") ? L"GIF" : L"IMAGE";
+}
+
+void draw_community()
+{
+    float cw = (LEFT_W - PADG * 2 - GAP * (COLS - 1)) / COLS;
+    float thumb_h = (cw - 12) * 10 / 16;
+    float ch = 6 + thumb_h + 42;
+    D2D1_RECT_F g = s.grid;
+
+    if (s.gstate == 0)
+        gallery_load();
+    if (s.gstate != 2) {
+        float cy = (g.top + g.bottom) / 2;
+        para(s.gstate == 3 ? L"Couldn't reach the gallery. Check your internet connection and try again."
+                           : L"Loading the gallery\x2026",
+             R(g.left + 60, cy - 40, g.right - 60, cy), s.th.sub);
+        if (s.gstate == 3)
+            button(R((g.left + g.right) / 2 - 60, cy + 4, (g.left + g.right) / 2 + 60, cy + 34), L"\xE72C", L"Try again",
+                   ID_GRETRY, false);
+        return;
+    }
+
+    UINT tiles = (UINT)s.gcount + 1; /* + "share your own" */
+    UINT rows = (tiles + COLS - 1) / COLS;
+    float content = PADG + rows * ch + (rows - 1) * GAP + PADG;
+    s.scroll_max = content - (g.bottom - g.top);
+    if (s.scroll_max < 0)
+        s.scroll_max = 0;
+    s.scroll = clampf(s.scroll, 0, s.scroll_max);
+
+    for (UINT k = 0; k < tiles; k++) {
+        float x = PADG + (k % COLS) * (cw + GAP);
+        float y = g.top + PADG + (k / COLS) * (ch + GAP) - s.scroll;
+        if (y + ch < g.top || y > g.bottom)
+            continue;
+        D2D1_RECT_F card = R(x, y, x + cw, y + ch);
+        D2D1_RECT_F clip = R(card.left, card.top > g.top ? card.top : g.top, card.right,
+                             card.bottom < g.bottom ? card.bottom : g.bottom);
+
+        if (k == (UINT)s.gcount) { /* share tile */
+            bool hov = s.hover == ID_GSHARE;
+            fill(card, hov ? s.th.hover : alpha(s.th.card, 0.5f), 7);
+            outline(card, hov ? s.th.sub : s.th.line, 7, 1, s.dash);
+            float cy = y + ch / 2;
+            text(L"\xE72D", R(x, cy - 30, x + cw, cy - 8), s.f_icon, s.th.sub, DWRITE_TEXT_ALIGNMENT_CENTER);
+            text(L"Share your own", R(x, cy - 6, x + cw, cy + 12), s.f_small, s.th.text, DWRITE_TEXT_ALIGNMENT_CENTER);
+            text(L"how to add yours", R(x + 4, cy + 12, x + cw - 4, cy + 28), s.f_small, s.th.faint,
+                 DWRITE_TEXT_ALIGNMENT_CENTER);
+            hit(clip, ID_GSHARE);
+            continue;
+        }
+
+        int i = (int)k;
+        const GalleryItem &gi = s.gitems[i];
+        WCHAR path[MAX_PATH];
+        gallery_local_path(&gi, path);
+        bool sel = str_ieq(path, shown_id());
+        bool hov = s.hover == ID_GCARD + i;
+        bool busy = s.ginstalling == i;
+
+        fill(card, hov || sel ? s.th.card : alpha(s.th.card, 0.6f), 7);
+        if (sel) {
+            outline(R(card.left - 2, card.top - 2, card.right + 2, card.bottom + 2), alpha(s.th.accent, 0.35f), 9, 2);
+            outline(card, s.th.accent, 7, 1.5f);
+        } else {
+            outline(card, hov ? s.th.sub : s.th.line, 7);
+        }
+
+        D2D1_RECT_F tr = R(x + 6, y + 6, x + cw - 6, y + 6 + thumb_h);
+        auto &v = s.gview[i];
+        if (v.ready && !v.tried) {
+            v.tried = true;
+            WCHAR png[MAX_PATH];
+            gallery_preview_path(&gi, png);
+            v.bmp = load_png(png);
+            if (v.bmp)
+                s.rt->CreateBitmapBrush(v.bmp,
+                                        D2D1::BitmapBrushProperties(D2D1_EXTEND_MODE_CLAMP, D2D1_EXTEND_MODE_CLAMP,
+                                                                    D2D1_BITMAP_INTERPOLATION_MODE_LINEAR),
+                                        &v.brush);
+        }
+        if (v.brush) {
+            Thumb t;
+            t.bmp = v.bmp;
+            t.brush = v.brush;
+            draw_thumb(&t, tr);
+        } else {
+            fill(tr, s.th.dark ? rgb(0x161616) : rgb(0xE9E9E9), 4);
+        }
+        if (busy) {
+            fill(tr, rgb(0x000000, 0.55f), 4);
+            text(L"Downloading\x2026", tr, s.f_small, rgb(0xFFFFFF), DWRITE_TEXT_ALIGNMENT_CENTER);
+        }
+        if (sel)
+            dot(tr.right - 9, tr.top + 9, 4, rgb(0x3FB950));
+
+        float ty = tr.bottom + 3;
+        const WCHAR *kind = gallery_kind(gi);
+        float tw = text_width(kind, s.f_mono);
+        text(kind, R(x + cw - 86, ty, x + cw - 8, ty + 20), s.f_mono, s.th.faint, DWRITE_TEXT_ALIGNMENT_TRAILING);
+        text(gi.name, R(x + 8, ty, x + cw - 14 - tw, ty + 20), s.f_small, sel || hov ? s.th.text : s.th.sub);
+        WCHAR by[64];
+        if (v.failed)
+            str_copy(by, L"Download failed: click to try again", 64);
+        else
+            wsprintfW(by, L"by %s", gi.author);
+        text(by, R(x + 8, ty + 18, x + cw - 8, ty + 36), s.f_small, v.failed ? rgb(0xE5534B) : s.th.faint);
+        hit(clip, ID_GCARD + i);
+    }
+
+    if (s.scroll_max > 0) {
+        float vh = g.bottom - g.top;
+        float bar_h = vh * vh / (vh + s.scroll_max);
+        float by = g.top + (vh - bar_h) * (s.scroll / s.scroll_max);
+        fill(R(LEFT_W - 6, by + 2, LEFT_W - 3, by + bar_h - 2), s.th.line, 1.5f);
+    }
+}
+
 void draw_grid()
 {
     s.grid = R(0, BAR, LEFT_W, H - FOOT);
+    if (s.filter == COMMUNITY) {
+        s.rt->PushAxisAlignedClip(s.grid, D2D1_ANTIALIAS_MODE_ALIASED);
+        draw_community();
+        s.rt->PopAxisAlignedClip();
+        return;
+    }
     float cw = (LEFT_W - PADG * 2 - GAP * (COLS - 1)) / COLS;
     float thumb_h = (cw - 12) * 10 / 16;
     float ch = 6 + thumb_h + 30;
@@ -1238,6 +1514,12 @@ void activate(int id)
         WCHAR exe[MAX_PATH];
         if (GetModuleFileNameW(nullptr, exe, MAX_PATH))
             ShellExecuteW(s.hwnd, L"open", exe, L"/s", nullptr, SW_SHOWNORMAL);
+    } else if (id >= ID_GCARD && id < ID_GCARD + s.gcount) {
+        gallery_pick(id - ID_GCARD);
+    } else if (id == ID_GRETRY) {
+        gallery_load();
+    } else if (id == ID_GSHARE) {
+        ShellExecuteW(s.hwnd, L"open", GALLERY_SHARE_URL, nullptr, nullptr, SW_SHOWNORMAL);
     } else if (id == ID_ADD) {
         add_files();
     } else if (id >= ID_FILTER && id < ID_FILTER + FILTERS) {
@@ -1416,6 +1698,28 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_APP_LOCKTAB:
         activate(ID_TAB + 1);
         return 0;
+    case WM_APP_GINDEX: {
+        int n = (int)w;
+        if (n >= 0 && l) {
+            memcpy(s.gitems, (const void *)l, sizeof(GalleryItem) * (SIZE_T)n);
+            s.gcount = n;
+            s.gstate = 2;
+        } else {
+            s.gstate = 3;
+        }
+        log_line(L"gallery: %d wallpapers listed%s", n < 0 ? 0 : n, n < 0 ? L" (couldn't reach the gallery)" : L"");
+        invalidate();
+        return 0;
+    }
+    case WM_APP_GPREVIEW:
+        if ((int)w < s.gcount && l) {
+            s.gview[w].ready = true;
+            invalidate();
+        }
+        return 0;
+    case WM_APP_GINSTALL:
+        gallery_installed((int)w, l != 0);
+        return 0;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -1461,6 +1765,7 @@ extern "C" void settings_run(int page)
     s.engine = engine_query();
     refresh_lock();
     s.tab = page == SETTINGS_LOCK ? 1 : 0;
+    s.ginstalling = -1;
 
     if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &s.d2d)) ||
         FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),

@@ -55,6 +55,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 | `lock.c/.h` | Turning livewall's screen saver on and off in Windows, keeping the `.scr` copy up to date |
 | `saver.c` | The screen saver window and its draw loop (same sources as the engine) |
 | `settings.cpp` | Custom-drawn settings window |
+| `gallery.c/.h` | Community tab downloads (settings process only, on worker threads): `index.json`, previews and wallpapers over HTTPS from `manndevani.github.io/livewall-gallery/` only, with size limits (list 1 MB, preview 8 MB, file 60 MB). Each file goes to a `.part` file, is checked against the SHA-256 in the list, then moved into place as `%APPDATA%\livewall\gallery\<id>\<name><ext>` (previews in `gallery\previews\`); file names come from livewall, never from the download. WinHTTP and BCrypt are loaded from System32 on first use, so the engine never loads them. Installed wallpapers are added to the library like any other file |
 | `shaders/` | HLSL. `fullscreen.hlsl` (VS), `blit` (textures + fit), `dim` (brightness), one file per built-in |
 
 ## Engine loop
