@@ -384,10 +384,22 @@ static void recover(void)
 static void start_quiet(BOOL attached)
 {
     PROCESS_POWER_THROTTLING_STATE eco;
+    WCHAR cmd[MAX_PATH + 16];
     e.quiet_mode = TRUE;
     log_line(attached ? L"on the desktop %u ms after start (graphics ready at %u ms, desktop found at %u ms)"
                       : L"still not on the desktop %u ms after start (graphics ready at %u ms, desktop found at %u ms)",
              GetTickCount() - e.start_tick, e.gpu_ms, e.progman_ms);
+
+    /* Housekeeping that can wait until the wallpaper shows. The startup
+       task is registered again only on the first run, when the exe moved,
+       or for a task from before -startup existed. */
+    autostart_command(cmd);
+    if (cfg.autostart && !str_ieq(cfg.autostart_exe, cmd) && autostart_apply(TRUE)) {
+        str_copy(cfg.autostart_exe, cmd, MAX_PATH + 16);
+        config_save(&cfg);
+    }
+    lock_refresh(); /* the screen saver copy follows this exe after an update */
+
     SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
     memset(&eco, 0, sizeof eco);
     eco.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
@@ -690,7 +702,6 @@ void engine_run(BOOL quiet)
 {
     HINSTANCE inst = GetModuleHandleW(NULL);
     HPOWERNOTIFY pn1, pn2;
-    WCHAR cmd[MAX_PATH + 16];
     LARGE_INTEGER f;
     WNDCLASSW wc;
     HANDLE mutex;
@@ -714,13 +725,8 @@ void engine_run(BOOL quiet)
        desktop (start_quiet), so they don't slow down the start. */
 
     first = !config_load(&cfg);
-    autostart_command(cmd);
-    /* First run, the exe moved, or a task from before -startup existed. */
-    if (cfg.autostart && !str_ieq(cfg.autostart_exe, cmd) && autostart_apply(TRUE))
-        str_copy(cfg.autostart_exe, cmd, MAX_PATH + 16);
-    if (first || !str_ieq(cfg.autostart_exe, cmd))
-        config_save(&cfg);
-    lock_refresh(); /* the screen saver copy follows this exe after an update */
+    if (first)
+        config_save(&cfg); /* the startup task is added once the wallpaper shows (start_quiet) */
 
     QueryPerformanceFrequency(&f);
     e.qpf = f.QuadPart;
@@ -748,9 +754,11 @@ void engine_run(BOOL quiet)
     e.icon = make_app_icon(GetSystemMetrics(SM_CXSMICON));
     e.status = ST_WAITING;
     tray(NIM_ADD);
-    log_line(L"engine started: %s", cfg.current);
+    log_line(L"engine started: %s (%u ms)", cfg.current, GetTickCount() - e.start_tick);
 
     load_source(FALSE); /* a still picture never even creates a graphics device */
+    if (gfx.dev)
+        e.gpu_ms = GetTickCount() - e.start_tick + 1;
     if (!gfx.dev && !e.still)
         log_line(L"Direct3D 11 is not available yet; will retry");
 
