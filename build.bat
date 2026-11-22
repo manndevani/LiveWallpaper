@@ -20,12 +20,16 @@ for %%s in (aurora dunes nightsky ripples glowgrid blit dim) do (
     fxc /nologo /T ps_4_0 /E ps_main /O3 /I %SH% /Vn g_ps_%%s /Fh build\ps_%%s.h %SH%\%%s.hlsl >nul || exit /b 1
 )
 
+rem /DEPENDENTLOADFLAG:0x800 (LOAD_LIBRARY_SEARCH_SYSTEM32): the DLLs livewall links
+rem against are only ever taken from System32, never from the folder livewall.exe is
+rem in, so a harmful DLL saved next to it (say, in Downloads) can't be loaded.
+
 rem File details (product name and version), shown in Explorer and required for code signing.
 rc /nologo /Isrc /fo build\livewall.res src\livewall.rc || exit /b 1
 
 cl /nologo /utf-8 /O1 /GS- /Gy /Zl /W4 /wd4201 /fp:fast /GR- /EHs-c- /Zc:threadSafeInit- ^
    /Ibuild /Isrc src\*.c src\*.cpp build\livewall.res /Fobuild\ /Fe:build\livewall.exe ^
-   /link /NODEFAULTLIB /ENTRY:entry /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF ^
+   /link /NODEFAULTLIB /ENTRY:entry /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /DEPENDENTLOADFLAG:0x800 ^
    kernel32.lib user32.lib gdi32.lib shell32.lib ole32.lib oleaut32.lib advapi32.lib uuid.lib ^
    dwmapi.lib wtsapi32.lib d3d11.lib dxgi.lib dxguid.lib mfplat.lib mfuuid.lib windowscodecs.lib ^
    d2d1.lib dwrite.lib runtimeobject.lib || exit /b 1

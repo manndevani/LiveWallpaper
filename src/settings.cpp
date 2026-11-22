@@ -1448,7 +1448,12 @@ bool grace_write(HWND owner, const WCHAR *secs)
     ex.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
     ex.hwnd = owner;
     ex.lpVerb = L"runas";
-    ex.lpFile = L"reg.exe";
+    /* Full path: a bare "reg.exe" is looked up in the current folder first,
+       and this one runs with admin rights. */
+    WCHAR reg[MAX_PATH + 16];
+    GetSystemDirectoryW(reg, MAX_PATH);
+    str_cat(reg, L"\\reg.exe", MAX_PATH + 16);
+    ex.lpFile = reg;
     ex.lpParameters = args;
     ex.nShow = SW_HIDE;
     if (ShellExecuteExW(&ex) && ex.hProcess) {

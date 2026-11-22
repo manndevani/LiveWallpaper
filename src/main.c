@@ -86,6 +86,10 @@ void __stdcall entry(void)
     const WCHAR *rest = next_arg(GetCommandLineW(), arg, MAX_PATH); /* skip the exe */
     int code = 0;
 
+    /* DLLs loaded by name from here on come from System32 only, never from
+       livewall's own folder (the linked ones already are: see build.bat).
+       Components that load by full path, such as codecs, are unaffected. */
+    SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32);
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     rest = next_arg(rest, arg, MAX_PATH);
 

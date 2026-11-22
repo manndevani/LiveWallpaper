@@ -9,6 +9,15 @@
 
 int _fltused = 0;
 
+/* The exe's load config table, which the C runtime would normally provide.
+   DependentLoadFlags = LOAD_LIBRARY_SEARCH_SYSTEM32 makes Windows take the
+   DLLs livewall links against from System32 only, never from the folder
+   livewall.exe is in (see /DEPENDENTLOADFLAG in build.bat). */
+const IMAGE_LOAD_CONFIG_DIRECTORY _load_config_used = {
+    .Size = sizeof(IMAGE_LOAD_CONFIG_DIRECTORY),
+    .DependentLoadFlags = LOAD_LIBRARY_SEARCH_SYSTEM32,
+};
+
 #pragma function(memset)
 void *memset(void *d, int c, size_t n)
 {
