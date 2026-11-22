@@ -708,6 +708,14 @@ void gallery_installed(int i, bool ok)
                     MB_ICONINFORMATION);
         return;
     }
+    /* A thumbnail tried before the file was here (say, the config already
+       named it) failed and would never be tried again: build it afresh. */
+    for (int k = 0; k < s.nthumbs; k++)
+        if (str_ieq(s.thumbs[k].id, path)) {
+            RELEASE(s.thumbs[k].brush);
+            RELEASE(s.thumbs[k].bmp);
+            s.thumbs[k].tried = false;
+        }
     if (s.tab == 1) {
         str_copy(cfg.lock, path, MAX_PATH);
         lock_changed();
