@@ -52,7 +52,12 @@ typedef HRESULT(WINAPI *CompileFn)(LPCVOID, SIZE_T, LPCSTR, const D3D_SHADER_MAC
 
 static ID3D11PixelShader *ps;
 
-static BOOL compile_custom(const WCHAR *path)
+#define E_LW_MISSING HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)
+#define E_LW_TOO_BIG HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE)
+
+/* Reads a custom shader file, wraps it and compiles it. The blobs belong to
+   d3dcompiler_47.dll: the caller releases them, then frees *dll. */
+static HRESULT compile_file(const WCHAR *path, ID3DBlob **code, ID3DBlob **err, HMODULE *dll_out)
 {
     SIZE_T np = sizeof kPrefix - 1, ns = sizeof kSuffix - 1;
     LARGE_INTEGER size;
@@ -61,20 +66,20 @@ static BOOL compile_custom(const WCHAR *path)
     char *src;
     HMODULE dll;
     CompileFn compile = NULL;
-    ID3DBlob *code = NULL, *err = NULL;
     HRESULT hr = E_FAIL;
 
+    *dll_out = NULL;
     f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (f == INVALID_HANDLE_VALUE)
-        return FALSE;
+        return E_LW_MISSING;
     if (!GetFileSizeEx(f, &size) || size.QuadPart > (1 << 20)) {
         CloseHandle(f);
-        return FALSE;
+        return E_LW_TOO_BIG;
     }
     src = (char *)mem_alloc(np + (SIZE_T)size.QuadPart + ns + 1);
     if (!src) {
         CloseHandle(f);
-        return FALSE;
+        return E_OUTOFMEMORY;
     }
     memcpy(src, kPrefix, np);
     ReadFile(f, src + np, (DWORD)size.QuadPart, &got, NULL);
@@ -88,7 +93,17 @@ static BOOL compile_custom(const WCHAR *path)
         compile = (CompileFn)(void *)GetProcAddress(dll, "D3DCompile");
     if (compile)
         hr = compile(src, np + got + ns, "shader", NULL, NULL, "lw_main", "ps_4_0",
-                     D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, &code, &err);
+                     D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, code, err);
+    *dll_out = dll;
+    mem_free(src);
+    return hr;
+}
+
+static BOOL compile_custom(const WCHAR *path)
+{
+    ID3DBlob *code = NULL, *err = NULL;
+    HMODULE dll;
+    HRESULT hr = compile_file(path, &code, &err, &dll);
     if (FAILED(hr)) {
         log_line(L"shader %s did not compile:", path);
         if (err)
@@ -101,8 +116,84 @@ static BOOL compile_custom(const WCHAR *path)
     RELEASE(err);
     if (dll)
         FreeLibrary(dll);
-    mem_free(src);
     return SUCCEEDED(hr);
+}
+
+static BOOL starts(const char *s, const char *with)
+{
+    for (; *with; s++, with++)
+        if (*s != *with)
+            return FALSE;
+    return TRUE;
+}
+
+static const char *find(const char *s, const char *what) /* strstr */
+{
+    for (; *s; s++)
+        if (starts(s, what))
+            return s;
+    return NULL;
+}
+
+/* Why a custom shader can't be shown, in a short sentence, or FALSE if it
+   compiles. Compiler messages look like
+     shader(12,5-9): error X3004: undeclared identifier 'foo'
+   and become "line 12: undeclared identifier 'foo'". */
+BOOL shader_problem(const WCHAR *path, WCHAR *out, int max)
+{
+    static char msg[300];
+    ID3DBlob *code = NULL, *err = NULL;
+    HMODULE dll;
+    HRESULT hr = compile_file(path, &code, &err, &dll);
+    const char *e, *p;
+    int line = 0, n = 0;
+
+    out[0] = 0;
+    if (SUCCEEDED(hr))
+        ;
+    else if (hr == E_LW_MISSING)
+        str_copy(out, L"the file can't be found", max);
+    else if (hr == E_LW_TOO_BIG)
+        str_copy(out, L"the file is larger than 1 MB", max);
+    else if (!err)
+        str_copy(out, L"the shader compiler isn't available", max);
+    else {
+        e = (const char *)ID3D10Blob_GetBufferPointer(err);
+        p = find(e, "error");
+        if (!p)
+            p = e;
+        /* Line number: the "(12," just before this message. */
+        for (n = (int)(p - e); n > 0 && e[n - 1] != '\n'; n--)
+            ;
+        for (; e + n < p && e[n] != '('; n++)
+            ;
+        if (e + n < p)
+            for (n++; e[n] >= '0' && e[n] <= '9'; n++)
+                line = line * 10 + (e[n] - '0');
+        /* Message: after "error X1234: ". */
+        if (starts(p, "error X")) {
+            const char *c = find(p, ": ");
+            if (c)
+                p = c + 2;
+        }
+        for (n = 0; p[n] && p[n] != '\n' && p[n] != '\r' && n < (int)sizeof msg - 1; n++)
+            msg[n] = p[n];
+        msg[n] = 0;
+        if (find(msg, "'mainImage'")) { /* reported in our suffix, past the file's end */
+            str_copy(out, L"the file has no mainImage function (see the custom shader guide)", max);
+        } else {
+            if (line > 0)
+                wsprintfW(out, L"line %d: ", line);
+            n = str_len(out);
+            MultiByteToWideChar(CP_UTF8, 0, msg, -1, out + n, max - n);
+            out[max - 1] = 0;
+        }
+    }
+    RELEASE(code);
+    RELEASE(err);
+    if (dll)
+        FreeLibrary(dll);
+    return FAILED(hr);
 }
 
 static BOOL sh_open(const WCHAR *id, SourceInfo *info)

@@ -15,6 +15,9 @@ BOOL preview_save_png(const WCHAR *path, UINT w, UINT h, const BYTE *bgra);
 /* livewall.exe -snapshot <id or file> <out.png> [seconds]: returns exit code */
 int snapshot_run(const WCHAR *id, const WCHAR *out, double at);
 int check_run(const WCHAR *file, const WCHAR *out); /* -check: see preview.c */
+/* Why a custom .hlsl can't be shown ("line 12: undeclared identifier 'foo'"),
+   or FALSE if it compiles. In src_shader.c. Loads the compiler for the call. */
+BOOL shader_problem(const WCHAR *path, WCHAR *out, int max);
 
 #ifdef __cplusplus
 }

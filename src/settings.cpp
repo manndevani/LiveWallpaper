@@ -127,6 +127,11 @@ struct State {
     LockState lock;      /* Windows' screen saver settings */
     bool grace_zero;     /* Windows asks for the password with no 5 s grace period */
 
+    /* Why the chosen custom shader can't be shown (see current_problem). */
+    WCHAR err_for[MAX_PATH];
+    WCHAR err_text[240];
+    bool err_has;
+
     /* The Community gallery (gallery.c), filled by worker threads. */
     int gstate;          /* 0 not loaded, 1 loading, 2 ready, 3 couldn't reach it */
     GalleryItem gitems[GALLERY_MAX];
@@ -256,6 +261,9 @@ void load_theme()
     DWORD light = 1, size = sizeof light;
     RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
                  L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
+#ifdef LW_TEST_LIGHT /* testing: light theme without changing the Windows setting */
+    light = 1;
+#endif
     Theme &t = s.th;
     t.dark = light == 0;
     if (t.dark) {
@@ -1155,19 +1163,40 @@ void draw_inspector()
     }
 }
 
+/* Why the chosen custom shader can't be shown, or null. Settings compiles it
+   itself, once per file and again when the window is activated, so the
+   reason shows even while the engine is paused (it only reports a failure
+   while drawing). */
+const WCHAR *current_problem()
+{
+    if (kind_of(cfg.current) != KIND_CUSTOM_SHADER)
+        return nullptr;
+    if (!str_ieq(s.err_for, cfg.current)) {
+        str_copy(s.err_for, cfg.current, MAX_PATH);
+        s.err_has = shader_problem(cfg.current, s.err_text, 240) != FALSE;
+    }
+    return s.err_has ? s.err_text : nullptr;
+}
+
 void draw_footer()
 {
     fill(R(0, H - FOOT, W, H), s.th.panel, 0);
     line(0, H - FOOT + 0.5f, W, H - FOOT + 0.5f, s.th.line);
-    WCHAR t[128];
+    WCHAR t[400];
     EngineInfo &e = s.engine;
-    if (e.status == ST_NOT_RUNNING)
+    const WCHAR *why = current_problem();
+    D2D1_COLOR_F tc = s.th.sub;
+    if (why || e.status == ST_ERROR) {
+        wsprintfW(t, L"%s can't be shown: %s", display_name(cfg.current),
+                  why ? why : L"see livewall.log (Open folder)");
+        tc = rgb(0xE5534B);
+    } else if (e.status == ST_NOT_RUNNING)
         str_copy(t, L"engine stopped \x00B7 wallpaper is not running", 128);
     else if (e.status == ST_RUNNING && e.fps)
         wsprintfW(t, L"rendering %u fps at %u\x00D7%u \x00B7 runs in the tray", e.fps, e.w, e.h);
     else
         wsprintfW(t, L"0 fps \x00B7 %s \x00B7 runs in the tray", status_text(e.status));
-    text(t, R(14, H - FOOT, W - 140, H), s.f_mono, s.th.sub);
+    text(t, R(14, H - FOOT, W - 140, H), s.f_mono, tc);
 
     const WCHAR *label = L"Open folder";
     float lw = text_width(label, s.f_small);
@@ -1626,6 +1655,7 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
             config_load(&cfg);
             refresh_engine();
             refresh_lock();
+            s.err_for[0] = 0; /* the shader file may have been edited meanwhile */
             invalidate();
         } else if (LOWORD(w) == WA_INACTIVE && !s.thumb_posted) {
             trim_memory(); /* in the background: give it back right away */

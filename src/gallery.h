@@ -16,7 +16,11 @@
 extern "C" {
 #endif
 
+#ifdef LW_TEST_NO_GALLERY /* testing: a host that never answers, as when offline */
+#define GALLERY_HOST L"livewall-gallery.invalid"
+#else
 #define GALLERY_HOST L"manndevani.github.io"
+#endif
 #define GALLERY_ROOT L"/livewall-gallery/"
 #define GALLERY_SHARE_URL L"https://github.com/manndevani/livewall-gallery/blob/main/SHARING.md"
 #define GALLERY_MAX 64
