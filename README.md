@@ -53,7 +53,7 @@ Five animated wallpapers come built in, and they repeat smoothly with no visible
 
 <p align="center"><img src="docs/images/settings.png" alt="livewall settings window" width="640"></p>
 
-Click a wallpaper to apply it. Adjust speed, brightness, frame rate, resolution and fit. It follows your light/dark theme and accent color.
+Click a wallpaper to apply it. Drag your own files onto the window to add them. Adjust speed, brightness, frame rate, resolution and fit. It follows your light/dark theme and accent color.
 
 ## Community wallpapers
 
@@ -100,6 +100,8 @@ After a moment paused, it gives its memory back to Windows (0.3 MB). Still pictu
 **Laptop with two graphics chips?** It uses the one that drives your screen. Turn on *Use integrated GPU* to save even more power.
 
 **Is there sound?** No. Video wallpapers are always muted.
+
+**Is it safe?** A wallpaper is only a picture, GIF, video or shader; livewall never runs a program that comes with one. It uses Windows' own decoders, which Windows Update keeps fixed, and it never sees your password. See [how livewall keeps your PC safe and light](docs/SAFETY.md).
 
 **Does it send my data anywhere?** No. livewall only goes online when you open the **Community** tab, and then only to download the gallery list and the wallpapers you pick. It sends nothing about you.
 

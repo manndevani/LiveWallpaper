@@ -39,6 +39,11 @@ Last updated: 2026-11-22
 - [x] Video previews no longer use the first frame (2026-11-22): `-snapshot`, `-check` and the "Same picture on lock screen" picture jump to the requested time, or a third of the way into shorter videos. Before, a video that fades in from black was judged blank by `-check`, so the gallery would have refused it; now a 12 s fade-in is pictured at 4 s and passes.
 - [x] Custom shader errors in Settings (2026-11-22): the footer says why the chosen `.hlsl` can't be shown, e.g. "broken.hlsl can't be shown: line 3: undeclared identifier 'wobble'", that it has no mainImage function, or that the file is missing. Settings compiles the file itself (once per file, and again when the window is brought back), so it shows even while the engine is paused. Checked with three broken files.
 - [x] Light theme of the settings window (2026-11-22, test build with `-DLW_TEST_LIGHT=1`): the library, Community and Lock screen views were captured and look right.
+- [x] Safety review (2026-11-22): threats, what livewall does and what is still open are written up in [SAFETY.md](SAFETY.md). Fixes from it:
+  - DLLs and `reg.exe` only from System32: 7 of 8 fake DLLs placed next to the exe were loaded before; after the fix none of 9 are, and videos, pictures and custom shaders still work.
+  - Memory handed back after a switch: shader after a video 18.1 MB → 1.1 MB working set.
+  - A wallpaper that makes Windows reset the graphics card twice within 2 minutes is replaced by a built-in until livewall restarts. Checked with a test build that fakes the reset (`-DLW_TEST_LOST=1`); a real reset was not caused on purpose.
+  - Drag and drop onto Settings adds files to the library (a folder and a `.txt` were skipped, a shader and a video added). Checked with a test build that fakes the drop (`-DLW_TEST_DROP=1`); **not yet dragged by hand** from File Explorer.
 
 ## Lock screen on Windows (screen saver, 2026-11-20)
 
@@ -108,6 +113,8 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 - The tray menu has still not been clicked by hand (2026-11-22): a right-click sent from a script didn't show the menu, probably because Windows only lets the program the user last clicked bring a menu to the front.
 
 ## Ideas / next
+
+- From the safety review (details in [SAFETY.md](SAFETY.md)): sign the gallery list with an offline key; decode untrusted files in a low-rights helper process; slow a shader down when it takes too long on the graphics card; share wallpapers through an issue form instead of a pull request; accept `.glsl` on Windows; show names without `.hlsl`; measure Linux memory on a real graphics card.
 
 - Other platforms: Android and macOS next. They will reuse `shaders/glsl/`.
 - Lock screen on the other platforms, always through the system's own lock (never a home-made password screen):

@@ -147,6 +147,14 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 - Other processes (indexer or antivirus) briefly lock `config.ini` now and then. Writers outside the app must retry.
 - Animated README preview (2026-11-20): `-snapshot` now moves a pretend cursor over time (it clicks every 3 s), so frame series of Ripples and Glow Grid show them reacting. WIC's own GIF palette (`IWICPalette::InitializeFromBitmap`) bands these dark gradients badly without dithering, and error diffusion makes the GIF ~2× bigger. A median-cut palette per frame plus a 4×4 ordered dither looked smooth: 480×270, 10 fps, 134 frames = 4.9 MB.
 
+## Safety review (2026-11-22, same Windows 11 machine)
+
+- **DLL search order.** Without the C runtime there is no load config table, so `/DEPENDENTLOADFLAG` alone does nothing (the linker warns LNK4266). Defining `_load_config_used` by hand with `DependentLoadFlags = LOAD_LIBRARY_SEARCH_SYSTEM32` makes it work. Before: 7 of 8 fake DLLs next to the exe were loaded (a broken one shows a "Bad Image" box to the user; suppress it in tests with `SetErrorMode`).
+- **Private bytes vs. working set.** A fresh engine shows ~102 MB private bytes but a 0.9 MB working set. The private bytes are almost all memory the graphics driver commits for the device and swap chain; it isn't touched. Report the working set as "RAM in use".
+- **Media Foundation stays loaded** after a video (MFPlat and the media engine DLLs stay in the process). Their pages can still be trimmed: the working set fell from 18.1 MB to 1.1 MB once a switch re-armed the trim.
+- **Clean config for test processes:** set `APPDATA` to an empty folder before starting a test exe; it then makes its own `config.ini` there. Put `start_with_windows=0` in it before starting a test *engine*, or it re-registers the startup task to point at the test exe. Its `livewall.reload` still reaches the user's real engine, which just re-reads the real config.
+- From PowerShell, `cmd /c build.bat` can fail with "not recognized" even after `cd`: cmd starts in the process's current folder, not PowerShell's location. Use the full path.
+
 ## Linux port (2026-11-20, tested in WSL2 Ubuntu 26.04, Mesa llvmpipe, no GPU)
 
 - **Same picture as Windows.** `-snapshot` of Aurora and Dunes at 9 s on Linux and on Windows look identical by eye. The GLSL versions use `mod(float)` for HLSL's integer `%`, and y-down pixel positions (`res.y - gl_FragCoord.y`).
