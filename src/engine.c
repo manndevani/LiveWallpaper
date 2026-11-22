@@ -62,6 +62,11 @@ static struct {
 
     UINT frames, fps;  /* presented frames, and the rate over the last second */
     LONGLONG fps_since;
+
+    /* Startup timing, until the window is first on the desktop: ms since
+       the engine started (0 = not yet). See start_quiet(). */
+    DWORD start_tick, gpu_ms, progman_ms;
+    BOOL quiet_mode;
 } e;
 
 /* ---- tray -------------------------------------------------------------- */
@@ -370,6 +375,28 @@ static void recover(void)
     load_source(FALSE); /* the next poll attaches the window again */
 }
 
+/* At sign-in the PC is busy and Explorer is still building the desktop.
+   Until the wallpaper is first on screen, the engine runs at normal priority
+   and checks every STARTUP_POLL_MS; after that it goes back to its quiet
+   settings: below-normal priority, efficiency mode (EcoQoS), POLL_MS. */
+#define STARTUP_POLL_MS 100
+
+static void start_quiet(BOOL attached)
+{
+    PROCESS_POWER_THROTTLING_STATE eco;
+    e.quiet_mode = TRUE;
+    log_line(attached ? L"on the desktop %u ms after start (graphics ready at %u ms, desktop found at %u ms)"
+                      : L"still not on the desktop %u ms after start (graphics ready at %u ms, desktop found at %u ms)",
+             GetTickCount() - e.start_tick, e.gpu_ms, e.progman_ms);
+    SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
+    memset(&eco, 0, sizeof eco);
+    eco.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
+    eco.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
+    eco.StateMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
+    SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &eco, sizeof eco);
+    SetCoalescableTimer(e.msg, 1, POLL_MS, NULL, 100);
+}
+
 static void poll(void)
 {
     /* SendMessageTimeout and CreateWindow dispatch incoming messages while
@@ -385,8 +412,17 @@ static void poll(void)
         load_source(FALSE); /* creates the device, e.g. once the GPU is ready at sign-in */
     if (e.wall && (!IsWindow(e.host) || !IsWindow(e.wall)))
         wall_detach(); /* Explorer restarted */
-    if (!e.wall && gfx.dev)
-        wall_attach();
+    if (!e.quiet_mode) { /* still starting: note when each piece became ready */
+        DWORD t = GetTickCount() - e.start_tick;
+        if (!e.gpu_ms && gfx.dev)
+            e.gpu_ms = t ? t : 1;
+        if (!e.progman_ms && FindWindowW(L"Progman", NULL))
+            e.progman_ms = t ? t : 1;
+    }
+    if (!e.wall && gfx.dev && wall_attach() && !e.quiet_mode)
+        start_quiet(TRUE);
+    if (!e.quiet_mode && GetTickCount() - e.start_tick > 60000)
+        start_quiet(FALSE); /* never wait at full speed for long */
     if (e.wall) {
         GetClientRect(e.host, &rc);
         if ((UINT)rc.right != gfx.ww || (UINT)rc.bottom != gfx.wh) {
@@ -653,7 +689,6 @@ static LRESULT CALLBACK msg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
 void engine_run(BOOL quiet)
 {
     HINSTANCE inst = GetModuleHandleW(NULL);
-    PROCESS_POWER_THROTTLING_STATE eco;
     HPOWERNOTIFY pn1, pn2;
     WCHAR cmd[MAX_PATH + 16];
     LARGE_INTEGER f;
@@ -672,15 +707,11 @@ void engine_run(BOOL quiet)
             settings_run(SETTINGS_MAIN);
         return;
     }
+    e.start_tick = GetTickCount();
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     allow_dark_menus();
-    SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
-    /* EcoQoS: let Windows run us on efficiency cores at low clocks. */
-    memset(&eco, 0, sizeof eco);
-    eco.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
-    eco.ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
-    eco.StateMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED;
-    SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &eco, sizeof eco);
+    /* Below-normal priority and EcoQoS come once the wallpaper is on the
+       desktop (start_quiet), so they don't slow down the start. */
 
     first = !config_load(&cfg);
     autostart_command(cmd);
@@ -726,8 +757,10 @@ void engine_run(BOOL quiet)
     WTSRegisterSessionNotification(e.msg, NOTIFY_FOR_THIS_SESSION);
     pn1 = RegisterPowerSettingNotification(e.msg, &kDisplayState, DEVICE_NOTIFY_WINDOW_HANDLE);
     pn2 = RegisterPowerSettingNotification(e.msg, &kPowerSource, DEVICE_NOTIFY_WINDOW_HANDLE);
-    SetCoalescableTimer(e.msg, 1, POLL_MS, NULL, 100);
+    SetCoalescableTimer(e.msg, 1, STARTUP_POLL_MS, NULL, 0);
     poll();
+    if (e.still && !e.quiet_mode)
+        start_quiet(TRUE); /* a still picture never attaches a window */
     if (first && !quiet)
         spawn_self(L"-settings"); /* first launch by the user: show what it is */
 

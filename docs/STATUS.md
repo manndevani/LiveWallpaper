@@ -74,6 +74,7 @@ GitHub Actions (`.github/workflows/build.yml`) builds the Windows exe and the Li
 SignPath's conditions: the build must be verifiable from source, each signing needs manual approval, product name and version must be set, GitHub needs MFA, and the README needs a code signing policy, privacy statement and uninstall steps.
 
 ## Implemented but not yet verified
+- [ ] Faster start at sign-in (2026-11-22): full speed and 100 ms checks until the wallpaper is on the desktop. A warm restart shows it 344 ms after start; a real power-on is not measured yet (read "on the desktop ... ms after start" in the log).
 
 - [x] **Start after a reboot** (2026-11-20): the sign-in task started the engine 19 s after boot, and the wallpaper attached. That first boot opened the settings window, because the real config did not exist yet (see FINDINGS.md). Fixed with `-startup`: tested with no config at all through `schtasks /Run`, and no window appeared. A second sign-in start exits silently, and opening the exe by hand still shows settings.
 - [ ] Interactive shaders reacting to the real mouse and clicks on the desktop. The shaders render with a simulated cursor, but live input has not been checked by eye.
