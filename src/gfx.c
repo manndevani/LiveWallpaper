@@ -7,6 +7,16 @@
 
 Gfx gfx;
 Fit source_fit = FIT_COVER;
+
+/* Timestamp queries for gfx_time_*: a small ring, so results can be read a
+   few frames later without stalling. Made once with the device. */
+#define TIME_RING 4
+static struct {
+    ID3D11Query *disjoint, *start, *end;
+    BOOL pending;
+} times[TIME_RING];
+static UINT time_next;
+static BOOL time_open; /* begin was issued for times[time_next] */
 float source_speed = 1.0f;
 
 float phase_at(double t)
@@ -140,6 +150,24 @@ BOOL gfx_init(BOOL low_power)
         return FALSE;
     }
 
+    { /* GPU timing for the speed guard; without it (unlikely) nothing is timed */
+        D3D11_QUERY_DESC qd;
+        UINT i;
+        memset(&qd, 0, sizeof qd);
+        for (i = 0; i < TIME_RING; i++) {
+            qd.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+            ID3D11Device_CreateQuery(gfx.dev, &qd, &times[i].disjoint);
+            qd.Query = D3D11_QUERY_TIMESTAMP;
+            ID3D11Device_CreateQuery(gfx.dev, &qd, &times[i].start);
+            ID3D11Device_CreateQuery(gfx.dev, &qd, &times[i].end);
+            times[i].pending = FALSE;
+        }
+        time_next = 0;
+        time_open = FALSE;
+        gfx.gpu_sum = 0;
+        gfx.gpu_n = 0;
+    }
+
     /* This pipeline state never changes, so bind it once. */
     ID3D11DeviceContext_IASetPrimitiveTopology(gfx.ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ID3D11DeviceContext_VSSetShader(gfx.ctx, gfx.vs, NULL, 0);
@@ -150,9 +178,17 @@ BOOL gfx_init(BOOL low_power)
 
 void gfx_free(void)
 {
+    UINT i;
     gfx_detach();
     if (gfx.ctx)
         ID3D11DeviceContext_ClearState(gfx.ctx);
+    for (i = 0; i < TIME_RING; i++) {
+        RELEASE(times[i].disjoint);
+        RELEASE(times[i].start);
+        RELEASE(times[i].end);
+        times[i].pending = FALSE;
+    }
+    time_open = FALSE;
     RELEASE(gfx.blend);
     RELEASE(gfx.samp);
     RELEASE(gfx.cb);
@@ -176,12 +212,14 @@ void gfx_free(void)
 static UINT pick_scale(UINT w, UINT h, UINT scale)
 {
     ULONGLONG budget = gfx.software ? AUTO_MAX_PIXELS_SOFTWARE : AUTO_MAX_PIXELS;
-    if (scale)
-        return scale;
-    scale = 1;
-    while (scale < 4 && (ULONGLONG)(w / scale) * (h / scale) > budget)
-        scale++;
-    return scale;
+    UINT ease = gfx.ease > 1 ? gfx.ease : 1; /* the speed guard's extra step */
+    if (!scale) {
+        scale = 1;
+        while (scale < 4 && (ULONGLONG)(w / scale) * (h / scale) > budget)
+            scale++;
+    }
+    scale *= ease;
+    return scale > 8 ? 8 : scale;
 }
 
 static void set_sizes(UINT w, UINT h, UINT scale)
@@ -331,3 +369,51 @@ void gfx_clear(void)
 }
 
 HRESULT gfx_present(void) { return gfx.sc ? IDXGISwapChain1_Present(gfx.sc, 0, 0) : E_FAIL; }
+
+/* Collects the frames the GPU has finished, without waiting. */
+static void time_collect(void)
+{
+    UINT i;
+    for (i = 0; i < TIME_RING; i++) {
+        D3D11_QUERY_DATA_TIMESTAMP_DISJOINT dj;
+        UINT64 t0, t1;
+        if (!times[i].pending)
+            continue;
+        if (ID3D11DeviceContext_GetData(gfx.ctx, (ID3D11Asynchronous *)times[i].disjoint, &dj, sizeof dj,
+                                        D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK)
+            continue; /* not done yet */
+        times[i].pending = FALSE;
+        if (dj.Disjoint || !dj.Frequency ||
+            ID3D11DeviceContext_GetData(gfx.ctx, (ID3D11Asynchronous *)times[i].start, &t0, sizeof t0,
+                                        D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK ||
+            ID3D11DeviceContext_GetData(gfx.ctx, (ID3D11Asynchronous *)times[i].end, &t1, sizeof t1,
+                                        D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK ||
+            t1 < t0)
+            continue; /* the GPU clock changed mid-frame: skip this one */
+        gfx.gpu_sum += (double)(t1 - t0) / (double)dj.Frequency;
+        gfx.gpu_n++;
+    }
+}
+
+void gfx_time_begin(void)
+{
+    if (!gfx.ctx || !times[0].end)
+        return;
+    time_collect();
+    time_open = !times[time_next].pending;
+    if (time_open) {
+        ID3D11DeviceContext_Begin(gfx.ctx, (ID3D11Asynchronous *)times[time_next].disjoint);
+        ID3D11DeviceContext_End(gfx.ctx, (ID3D11Asynchronous *)times[time_next].start);
+    }
+}
+
+void gfx_time_end(void)
+{
+    if (!time_open)
+        return;
+    ID3D11DeviceContext_End(gfx.ctx, (ID3D11Asynchronous *)times[time_next].end);
+    ID3D11DeviceContext_End(gfx.ctx, (ID3D11Asynchronous *)times[time_next].disjoint);
+    times[time_next].pending = TRUE;
+    time_next = (time_next + 1) % TIME_RING;
+    time_open = FALSE;
+}

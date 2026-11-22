@@ -1215,7 +1215,12 @@ void draw_footer()
         tc = rgb(0xE5534B);
     } else if (e.status == ST_NOT_RUNNING)
         str_copy(t, L"engine stopped \x00B7 wallpaper is not running", 128);
-    else if (e.status == ST_RUNNING && e.fps)
+    else if (e.status == ST_RUNNING && e.fps && e.eased) {
+        /* the engine's speed guard stepped a heavy shader down */
+        wsprintfW(t, L"%u fps at %u\x00D7%u \x00B7 lowered: this shader is heavy for your graphics card", e.fps, e.w,
+                  e.h);
+        tc = rgb(0xD29922);
+    } else if (e.status == ST_RUNNING && e.fps)
         wsprintfW(t, L"rendering %u fps at %u\x00D7%u \x00B7 runs in the tray", e.fps, e.w, e.h);
     else
         wsprintfW(t, L"0 fps \x00B7 %s \x00B7 runs in the tray", status_text(e.status));
@@ -1277,7 +1282,7 @@ void paint()
 void refresh_engine()
 {
     EngineInfo e = engine_query();
-    if (e.status != s.engine.status || e.fps != s.engine.fps || e.w != s.engine.w) {
+    if (e.status != s.engine.status || e.fps != s.engine.fps || e.w != s.engine.w || e.eased != s.engine.eased) {
         s.engine = e;
         invalidate();
     }

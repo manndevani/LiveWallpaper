@@ -153,6 +153,12 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 - **Private bytes vs. working set.** A fresh engine shows ~102 MB private bytes but a 0.9 MB working set. The private bytes are almost all memory the graphics driver commits for the device and swap chain; it isn't touched. Report the working set as "RAM in use".
 - **Media Foundation stays loaded** after a video (MFPlat and the media engine DLLs stay in the process). Their pages can still be trimmed: the working set fell from 18.1 MB to 1.1 MB once a switch re-armed the trim.
 - **Clean config for test processes:** set `APPDATA` to an empty folder before starting a test exe; it then makes its own `config.ini` there. Put `start_with_windows=0` in it before starting a test *engine*, or it re-registers the startup task to point at the test exe. Its `livewall.reload` still reaches the user's real engine, which just re-reads the real config.
+- **Timing shaders on the graphics card.** D3D11 timestamp queries cost nothing and never stall: a DISJOINT query around two TIMESTAMPs, in a ring of 4, read with `D3D11_ASYNC_GETDATA_DONOTFLUSH`. Aurora takes 0.06 ms per frame at 1920×1080.
+- **The same frame measures slower when the card is lightly loaded**, because the card lowers its own clock.
+  - A test shader read 3.5 ms per frame, then 9.6 ms a few seconds later, with nothing else changed.
+  - So a limit of 20% busy also lowered shaders that were fine.
+  - At 50% busy for 5 seconds, only a really heavy shader trips it: 98% busy did, 27% didn't.
+- **A test engine started with `Start-Process` can outlive `Stop-Process $p`**. Stop it by name and wait. If the real engine starts while a test engine still has its window, the real one quits at once (only one engine runs at a time), and no wallpaper is left running.
 - From PowerShell, `cmd /c build.bat` can fail with "not recognized" even after `cd`: cmd starts in the process's current folder, not PowerShell's location. Use the full path.
 
 ## Linux port (2026-11-20, tested in WSL2 Ubuntu 26.04, Mesa llvmpipe, no GPU)

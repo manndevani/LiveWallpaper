@@ -64,6 +64,10 @@ static struct {
     double click_at;
 
     UINT frames, fps;  /* presented frames, and the rate over the last second */
+    UINT ease;         /* speed guard level, 0..3 (see speed_guard) */
+    WCHAR ease_for[MAX_PATH]; /* the wallpaper that level is for */
+    UINT heavy;        /* seconds in a row the shader was too heavy */
+    BOOL gpu_logged;   /* GPU cost of this wallpaper logged once */
     LONGLONG fps_since;
 
     /* Startup timing, until the window is first on the desktop: ms since
@@ -106,6 +110,8 @@ static void arm_timer(LONGLONG due)
 static void update_interval(void)
 {
     UINT fps = e.info.tick_fps ? max(e.info.tick_fps, cfg.fps) : cfg.fps;
+    if (e.ease >= 2 && fps > 15)
+        fps = 15; /* the speed guard's second step */
     e.interval = e.qpf / (fps ? fps : 30);
 }
 
@@ -159,9 +165,12 @@ static void render(BOOL advance, BOOL force)
         }
     }
 
+    if (e.src == &src_shader)
+        gfx_time_begin();
     if (e.src->draw(&f, force)) {
         HRESULT hr;
         gfx_dim(1.0f - cfg.brightness / 100.0f);
+        gfx_time_end();
         hr = gfx_present();
 #ifdef LW_TEST_LOST
         { /* pretend the GPU was reset every 90 frames */
@@ -174,6 +183,8 @@ static void render(BOOL advance, BOOL force)
             e.lost = TRUE;
         else
             e.frames++;
+    } else {
+        gfx_time_end(); /* nothing drawn: the timing covers an empty frame */
     }
 }
 
@@ -363,6 +374,18 @@ static void load_source(BOOL fallback)
             s = NULL;
     }
     e.src = s;
+    /* The speed guard starts over for another wallpaper (or a fallback),
+       but keeps its level when the same one is loaded again (a setting
+       changed, the GPU was reset). */
+    if (s != &src_shader || e.error || !str_ieq(e.ease_for, cfg.current)) {
+        e.ease = 0;
+        e.gpu_logged = FALSE;
+    }
+    str_copy(e.ease_for, s == &src_shader && !e.error ? cfg.current : L"", MAX_PATH);
+    e.heavy = 0;
+    gfx.ease = e.ease >= 3 ? 4 : e.ease ? 2 : 1;
+    gfx.gpu_sum = 0;
+    gfx.gpu_n = 0;
     update_interval();
     /* A switch can leave the old wallpaper's memory behind (a video's
        decoder, ~15 MB): hand it back soon, also while paused. */
@@ -442,6 +465,52 @@ static void start_quiet(BOOL attached)
     SetCoalescableTimer(e.msg, 1, POLL_MS, NULL, 100);
 }
 
+/* Speed guard, once a second: a shader that keeps the graphics card busy
+   more than GUARD_BUSY_PCT of the time for GUARD_SECS seconds in a row is
+   stepped down: 1 half resolution, 2 also 15 fps, 3 quarter resolution.
+   It drains the battery and spins up the fans otherwise, and a wallpaper
+   should never be what makes the PC feel slow.
+   The limit is high on purpose: a lightly loaded card lowers its own clock,
+   so the same frame can measure 3x slower a few seconds later (FINDINGS).
+   Only a card that stays half busy is really working hard. */
+#define GUARD_BUSY_PCT 50
+#define GUARD_SECS 5
+
+static void speed_guard(void)
+{
+    static const WCHAR *const steps[] = {L"", L"half resolution", L"half resolution and 15 fps",
+                                         L"quarter resolution and 15 fps"};
+    UINT n = gfx.gpu_n, us, pct;
+    double per;
+
+    gfx.gpu_n = 0;
+    per = n ? gfx.gpu_sum / n : 0;
+    gfx.gpu_sum = 0;
+    if (e.src != &src_shader || !e.running || n < 5 || !e.fps)
+        return;
+    us = (UINT)(per * 1e6);
+    pct = (UINT)(per * e.fps * 100.0 + 0.5);
+    if (!e.gpu_logged) {
+        e.gpu_logged = TRUE;
+        log_line(L"graphics card: %u us per frame at %ux%u, %u fps (%u%% busy)", us, gfx.bw, gfx.bh, e.fps, pct);
+    }
+    if (pct <= GUARD_BUSY_PCT) {
+        e.heavy = 0;
+        return;
+    }
+    if (++e.heavy < GUARD_SECS || e.ease >= 3)
+        return;
+    e.heavy = 0;
+    e.ease++;
+    gfx.ease = e.ease >= 3 ? 4 : 2;
+    log_line(L"%s keeps the graphics card %u%% busy (%u us per frame at %ux%u); now drawing at %s",
+             cfg.current, pct, us, gfx.bw, gfx.bh, steps[e.ease]);
+    update_interval();
+    if (gfx.sc && !gfx_resize(gfx.ww, gfx.wh, want_scale()))
+        wall_detach();
+    e.gpu_logged = FALSE; /* log the cost at the new level too */
+}
+
 static void poll(void)
 {
     /* SendMessageTimeout and CreateWindow dispatch incoming messages while
@@ -492,6 +561,7 @@ static void poll(void)
         e.fps = (UINT)(e.frames * e.qpf / (now.QuadPart - e.fps_since));
         e.frames = 0;
         e.fps_since = now.QuadPart;
+        speed_guard();
     }
 
     update_state();
@@ -665,7 +735,7 @@ static LRESULT CALLBACK msg_proc(HWND h, UINT m, WPARAM w, LPARAM l)
     }
     if (m && m == e.wm_status) {
         return (LRESULT)e.status | ((LRESULT)(e.running ? e.fps : 0) << 8) | ((LRESULT)gfx.bw << 24) |
-               ((LRESULT)gfx.bh << 40);
+               ((LRESULT)gfx.bh << 40) | ((LRESULT)e.ease << 56);
     }
     if (m && m == e.wm_pause) {
         e.user_paused = w == 2 ? !e.user_paused : w != 0;

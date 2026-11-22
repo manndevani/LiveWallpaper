@@ -12,6 +12,7 @@ typedef struct {
     EngineStatus status;
     UINT fps;  /* frames actually presented in the last second */
     UINT w, h; /* render resolution */
+    UINT eased; /* speed guard level: 0 none, 1..3 drawing at less (a heavy shader) */
 } EngineInfo;
 
 HWND engine_window(void);

@@ -5,7 +5,7 @@
 HWND engine_window(void) { return FindWindowW(ENGINE_CLASS, NULL); }
 
 /* The engine packs its answer into the LRESULT:
-   bits 0-7 status, 8-23 fps, 24-39 width, 40-55 height. */
+   bits 0-7 status, 8-23 fps, 24-39 width, 40-55 height, 56-57 speed guard level. */
 EngineInfo engine_query(void)
 {
     EngineInfo info;
@@ -17,6 +17,7 @@ EngineInfo engine_query(void)
         info.fps = (UINT)((r >> 8) & 0xFFFF);
         info.w = (UINT)((r >> 24) & 0xFFFF);
         info.h = (UINT)((r >> 40) & 0xFFFF);
+        info.eased = (UINT)((r >> 56) & 0x3);
     }
     return info;
 }

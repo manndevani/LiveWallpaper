@@ -31,7 +31,7 @@ Running `livewall.exe` while the engine is already up opens settings instead of 
 ```
 
 IPC uses registered window messages to the engine's hidden window (class `livewall_engine`); see `ipc.c`.
-`livewall.status` returns a packed `LRESULT`: status in bits 0–7, fps in 8–23, width in 24–39 and height in 40–55.
+`livewall.status` returns a packed `LRESULT`: status in bits 0–7, fps in 8–23, width in 24–39, height in 40–55, and the speed guard level in 56–57 (0–3: how far a heavy shader has been lowered).
 
 ## Modules (`src/`)
 

@@ -41,6 +41,9 @@ typedef struct {
     UINT ww, wh;     /* window size */
     UINT bw, bh;     /* back buffer size */
     UINT scale;
+    UINT ease;       /* extra resolution divider from the speed guard (0 or 1 = none) */
+    double gpu_sum;  /* GPU seconds of the frames timed since the engine last reset it */
+    UINT gpu_n;      /* how many frames that is */
     BOOL software;   /* no usable GPU driver: Direct3D's CPU renderer (WARP) */
 } Gfx;
 
@@ -63,3 +66,9 @@ void gfx_dim(float amount); /* darken the frame: 0 none, 1 black */
 void gfx_clear(void);
 void gfx_unbind(void);
 HRESULT gfx_present(void);
+
+/* GPU time of one frame: call begin before drawing and end after it (before
+   present). Results arrive a few frames later in gpu_sum / gpu_n; nothing
+   waits for the GPU. Frames are skipped while the GPU is behind. */
+void gfx_time_begin(void);
+void gfx_time_end(void);

@@ -43,6 +43,11 @@ Last updated: 2026-11-22
   - DLLs and `reg.exe` only from System32: 7 of 8 fake DLLs placed next to the exe were loaded before; after the fix none of 9 are, and videos, pictures and custom shaders still work.
   - Memory handed back after a switch: shader after a video 18.1 MB → 1.1 MB working set.
   - A wallpaper that makes Windows reset the graphics card twice within 2 minutes is replaced by a built-in until livewall restarts. Checked with a test build that fakes the reset (`-DLW_TEST_LOST=1`); a real reset was not caused on purpose.
+  - Speed guard for shaders: the engine times each shader frame on the graphics card. It uses timestamp queries and reads them a few frames later, so nothing waits.
+    - A shader that keeps the card more than 50% busy for 5 seconds in a row is lowered in steps: half resolution, then also 15 fps, then quarter resolution.
+    - The Settings footer then says so in amber: "lowered: this shader is heavy for your graphics card". The level resets when another wallpaper is chosen.
+    - Checked with made-up test shaders. One at 27% busy was left alone. One at 98% busy (16 fps) went to half resolution and settled at 46% busy, 28 fps.
+    - Built-ins cost far less: Aurora takes 0.06 ms per frame.
   - Drag and drop onto Settings adds files to the library (a folder and a `.txt` were skipped, a shader and a video added). Checked with a test build that fakes the drop (`-DLW_TEST_DROP=1`); **not yet dragged by hand** from File Explorer.
 
 ## Lock screen on Windows (screen saver, 2026-11-20)
@@ -116,7 +121,7 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 
 ## Ideas / next
 
-- From the safety review (details in [SAFETY.md](SAFETY.md)): decode untrusted files in a low-rights helper process; slow a shader down when it takes too long on the graphics card; share wallpapers through an issue form instead of a pull request; accept `.glsl` on Windows; show names without `.hlsl`; measure Linux memory on a real graphics card.
+- From the safety review (details in [SAFETY.md](SAFETY.md)): decode untrusted files in a low-rights helper process; share wallpapers through an issue form instead of a pull request; accept `.glsl` on Windows; show names without `.hlsl`; measure Linux memory on a real graphics card.
 
 - Other platforms: Android and macOS next. They will reuse `shaders/glsl/`.
 - Lock screen on the other platforms, always through the system's own lock (never a home-made password screen):

@@ -37,7 +37,9 @@ A live wallpaper runs all day, opens files that other people made, and sits next
 - The gallery measures how much work each shader takes and turns down one that takes more than 15 times the work of a simple reference shader.
 - **New (2026-11-22):** if the graphics card is reset twice within 2 minutes while the same wallpaper is showing, livewall shows a built-in wallpaper instead and doesn't load that one again until it restarts. Before, it loaded the same shader again after each reset, which could freeze the screen over and over. Windows may block a program from the graphics card after many resets.
 
-**Still open.** A shader that is heavy but not heavy enough for a reset makes the graphics card work hard and drains the battery. Fix: measure the time each frame takes on the graphics card and lower the frame rate or resolution, or warn in Settings, when a shader is too slow.
+- **New (2026-11-22):** livewall measures how long each shader frame takes on the graphics card. If a shader keeps the card more than half busy for 5 seconds in a row, livewall lowers it in steps: first a lower resolution, then also 15 frames per second, then a quarter of the resolution. Settings says when a shader has been lowered. Before, a shader that was heavy but not heavy enough for a reset kept the card working hard and drained the battery.
+
+**Still open.** A shader so heavy that a single frame takes seconds still causes a reset before livewall can lower it. The reset guard above handles that case.
 
 ### A fake DLL in the same folder
 
