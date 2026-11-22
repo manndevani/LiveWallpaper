@@ -20,6 +20,9 @@
 #include <dwmapi.h>
 #include <shobjidl.h>
 #include <shellapi.h>
+#ifdef LW_TEST_DROP
+#include <shlobj.h> /* DROPFILES */
+#endif
 #include <wincodec.h>
 #include <windowsx.h>
 #include <roapi.h>
@@ -929,7 +932,7 @@ void draw_grid()
             float cy = y + ch / 2;
             text(L"\xE710", R(x, cy - 30, x + cw, cy - 8), s.f_icon, s.th.sub, DWRITE_TEXT_ALIGNMENT_CENTER);
             text(L"Add wallpaper", R(x, cy - 6, x + cw, cy + 12), s.f_small, s.th.text, DWRITE_TEXT_ALIGNMENT_CENTER);
-            text(L"videos \x00B7 GIFs \x00B7 images \x00B7 shaders", R(x + 4, cy + 12, x + cw - 4, cy + 28), s.f_small, s.th.faint,
+            text(L"or drop files here", R(x + 4, cy + 12, x + cw - 4, cy + 28), s.f_small, s.th.faint,
                  DWRITE_TEXT_ALIGNMENT_CENTER);
             hit(clip, ID_ADD);
             continue;
@@ -1278,6 +1281,41 @@ void apply(bool start)
     invalidate();
 }
 
+/* Adds files to the library and shows the first one. Returns false when none
+   of them is a kind livewall can show. */
+bool add_paths(const WCHAR *const *paths, UINT n)
+{
+    bool any = false;
+    for (UINT i = 0; i < n; i++)
+        if (lib_add(&cfg, paths[i]) && !any) {
+            str_copy(cfg.current, paths[i], MAX_PATH); /* show the first one right away */
+            any = true;
+        }
+    if (any) {
+        s.filter = 0;
+        s.scroll = 1e6f; /* scroll to the end, where new items are */
+        apply(true);
+    }
+    return any;
+}
+
+/* Files dragged onto the window from File Explorer. */
+void drop_files(HDROP drop)
+{
+    static WCHAR names[16][MAX_PATH];
+    const WCHAR *list[16];
+    UINT n = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0), k = 0;
+    for (UINT i = 0; i < n && k < 16; i++)
+        if (DragQueryFileW(drop, i, names[k], MAX_PATH) && !(GetFileAttributesW(names[k]) & FILE_ATTRIBUTE_DIRECTORY)) {
+            list[k] = names[k];
+            k++;
+        }
+    DragFinish(drop);
+    SetForegroundWindow(s.hwnd);
+    if (!add_paths(list, k))
+        MessageBeep(MB_ICONWARNING); /* not a video, picture, GIF or shader */
+}
+
 void add_files()
 {
     IFileOpenDialog *dlg = nullptr;
@@ -1299,26 +1337,19 @@ void add_files()
         IShellItemArray *items = nullptr;
         if (SUCCEEDED(dlg->GetResults(&items))) {
             DWORD n = 0;
-            bool any = false;
+            static PWSTR picked[64];
+            UINT k = 0;
             items->GetCount(&n);
-            for (DWORD i = 0; i < n; i++) {
+            for (DWORD i = 0; i < n && k < 64; i++) {
                 IShellItem *it = nullptr;
-                PWSTR p = nullptr;
-                if (SUCCEEDED(items->GetItemAt(i, &it)) && SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &p))) {
-                    if (lib_add(&cfg, p) && !any) {
-                        str_copy(cfg.current, p, MAX_PATH); /* show the first one right away */
-                        any = true;
-                    }
-                    CoTaskMemFree(p);
-                }
+                if (SUCCEEDED(items->GetItemAt(i, &it)) && SUCCEEDED(it->GetDisplayName(SIGDN_FILESYSPATH, &picked[k])))
+                    k++;
                 RELEASE(it);
             }
             RELEASE(items);
-            if (any) {
-                s.filter = 0;
-                s.scroll = 1e6f; /* scroll to the end, where new items are */
-                apply(true);
-            }
+            add_paths(picked, k);
+            for (UINT i = 0; i < k; i++)
+                CoTaskMemFree(picked[i]);
         }
     }
     RELEASE(dlg);
@@ -1743,6 +1774,9 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
     case WM_APP_ADD:
         add_files();
         return 0;
+    case WM_DROPFILES:
+        drop_files((HDROP)w);
+        return 0;
     case WM_APP_THUMB:
         build_next_thumb();
         return 0;
@@ -1850,6 +1884,24 @@ extern "C" void settings_run(int page)
         CoUninitialize();
         return;
     }
+    DragAcceptFiles(s.hwnd, TRUE);
+#ifdef LW_TEST_DROP
+    { /* fake a drop of the files in LW_DROP (separated by |), as File Explorer would */
+        static WCHAR list[2048];
+        DWORD n = GetEnvironmentVariableW(L"LW_DROP", list, 2046);
+        HGLOBAL g = n ? GlobalAlloc(GMEM_ZEROINIT, sizeof(DROPFILES) + (n + 2) * sizeof(WCHAR)) : nullptr;
+        if (g) {
+            DROPFILES *d = (DROPFILES *)GlobalLock(g);
+            WCHAR *p = (WCHAR *)(d + 1);
+            d->pFiles = sizeof(DROPFILES);
+            d->fWide = TRUE;
+            for (DWORD i = 0; i < n; i++)
+                p[i] = list[i] == '|' ? 0 : list[i];
+            GlobalUnlock(g);
+            PostMessageW(s.hwnd, WM_DROPFILES, (WPARAM)g, 0);
+        }
+    }
+#endif
     UINT dpi = GetDpiForWindow(s.hwnd);
     RECT r = {0, 0, (LONG)(W * dpi / 96), (LONG)(H * dpi / 96)};
     AdjustWindowRectExForDpi(&r, style, FALSE, 0, dpi);
