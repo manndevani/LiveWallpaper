@@ -10,6 +10,7 @@
 | `livewall.exe -add` | Settings window, opening the file picker | only while open |
 | `livewall.exe -quit` | Stops the engine and waits until it has exited | instant |
 | `livewall.exe -snapshot <id> <out.png> [sec]` | Renders one frame offscreen (testing) | instant |
+| `livewall.exe -check <file> <out.png>` | The gallery's safety check: opens and draws a wallpaper file the way the engine does, saves the frame at 8 s, and writes `<out.png>.txt` (`ok`, `kind`, `us_per_frame` over 30 frames at 960x540, `blank`). Exit code 0 only if it drew. | a second or two |
 | `livewall.scr /s`, `/p <hwnd>`, `/c` | **Screen saver** (`saver.c`): full screen, the preview in Windows' dialog, or settings on the Lock screen tab | while the PC is idle |
 
 The UI lives in a separate process so the engine never pays for Direct2D, DirectWrite, the shell or thumbnails.

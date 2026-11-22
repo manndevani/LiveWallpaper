@@ -14,6 +14,7 @@ BOOL preview_render(const WCHAR *id, UINT w, UINT h, double at, BYTE *bgra);
 BOOL preview_save_png(const WCHAR *path, UINT w, UINT h, const BYTE *bgra);
 /* livewall.exe -snapshot <id or file> <out.png> [seconds]: returns exit code */
 int snapshot_run(const WCHAR *id, const WCHAR *out, double at);
+int check_run(const WCHAR *file, const WCHAR *out); /* -check: see preview.c */
 
 #ifdef __cplusplus
 }

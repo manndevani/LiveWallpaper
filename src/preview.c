@@ -8,6 +8,11 @@
 
 static BOOL own_device;
 
+/* -check: after the first good frame, preview_render draws this many more
+   and stores the average time per frame (waiting for the GPU each time). */
+static UINT g_time_frames;
+static double g_ms_per_frame;
+
 /* Fractional part, also for negative x. */
 static double frac(double x)
 {
@@ -110,6 +115,23 @@ BOOL preview_render(const WCHAR *id, UINT w, UINT h, double at, BYTE *bgra)
             if (!ok)
                 Sleep(30);
         }
+        if (ok && g_time_frames) {
+            LARGE_INTEGER a, b, q;
+            QueryPerformanceFrequency(&q);
+            QueryPerformanceCounter(&a);
+            for (i = 0; i < g_time_frames; i++) {
+                f.time += 1.0 / 30.0;
+                s->draw(&f, TRUE);
+                /* Reading back a pixel waits until the GPU has really drawn it. */
+                ID3D11DeviceContext_CopyResource(gfx.ctx, (ID3D11Resource *)staging, (ID3D11Resource *)tex);
+                if (SUCCEEDED(ID3D11DeviceContext_Map(gfx.ctx, (ID3D11Resource *)staging, 0, D3D11_MAP_READ, 0, &m)))
+                    ID3D11DeviceContext_Unmap(gfx.ctx, (ID3D11Resource *)staging, 0);
+            }
+            QueryPerformanceCounter(&b);
+            g_ms_per_frame = (double)(b.QuadPart - a.QuadPart) * 1000.0 / (double)q.QuadPart / g_time_frames;
+            f.time = at;
+            s->draw(&f, TRUE); /* the saved picture is the frame at `at` */
+        }
         s->close();
     }
     if (ok) {
@@ -160,6 +182,52 @@ BOOL preview_save_png(const WCHAR *path, UINT w, UINT h, const BYTE *bgra)
     RELEASE(stream);
     RELEASE(wic);
     return SUCCEEDED(hr);
+}
+
+/* livewall.exe -check <file> <out.png>: the gallery's safety check. Opens a
+   wallpaper file exactly as the engine would, saves the frame at 8 s to
+   out.png, and writes <out.png>.txt with what it found:
+     ok=1|0  kind=shader|video|gif|image|unknown  us_per_frame=N  blank=1|0
+   us_per_frame is the average of 30 frames at 960x540 on this machine's
+   GPU (on a CI runner with no GPU: WARP, a CPU renderer, so much slower).
+   Compiler errors go to the log as usual. Exit code 0 only if ok=1. */
+int check_run(const WCHAR *file, const WCHAR *out)
+{
+    static const char *kinds[] = {"shader", "shader", "video", "gif", "image", "unknown"};
+    const UINT w = 960, h = 540;
+    static WCHAR txt[MAX_PATH + 8];
+    static char line[200];
+    BYTE *px;
+    BOOL ok = FALSE, blank = TRUE;
+    Kind k = kind_of(file);
+    HANDLE f;
+    DWORD put, i;
+
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    px = (BYTE *)mem_alloc((SIZE_T)w * h * 4);
+    g_time_frames = 30;
+    g_ms_per_frame = 0;
+    if (k != KIND_SHADER && px && preview_begin() && preview_render(file, w, h, 8.0, px)) {
+        ok = preview_save_png(out, w, h, px);
+        for (i = 4; i < (DWORD)w * h * 4 && blank; i += 4) /* every pixel the same colour */
+            blank = px[i] == px[0] && px[i + 1] == px[1] && px[i + 2] == px[2];
+    }
+    g_time_frames = 0;
+    preview_end();
+    mem_free(px);
+    CoUninitialize();
+
+    wsprintfA(line, "ok=%d\r\nkind=%s\r\nus_per_frame=%u\r\nblank=%d\r\n", ok ? 1 : 0, kinds[k],
+              (UINT)(g_ms_per_frame * 1000.0), ok && blank ? 1 : 0);
+    str_copy(txt, out, MAX_PATH);
+    str_cat(txt, L".txt", MAX_PATH + 8);
+    f = CreateFileW(txt, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (f != INVALID_HANDLE_VALUE) {
+        WriteFile(f, line, (DWORD)lstrlenA(line), &put, NULL);
+        CloseHandle(f);
+    }
+    log_line(L"check %s: %s", file, ok ? L"ok" : L"failed");
+    return ok ? 0 : 1;
 }
 
 int snapshot_run(const WCHAR *id, const WCHAR *out, double at)

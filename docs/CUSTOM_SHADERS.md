@@ -32,6 +32,10 @@ Still to change by hand: `texture()` and iChannels (not supported), `const` arra
 - If the shader doesn't compile, livewall shows the default wallpaper instead. The compiler error is written to `%APPDATA%\livewall\livewall.log`; open it with **Open folder** in the settings window.
 - Shaders are compiled with `ps_4_0`, so any GPU since about 2008 works.
 
+## Sharing it
+
+Share your shader with everyone in the [livewall gallery](https://github.com/manndevani/livewall-gallery). Every shared shader is checked first: it must compile without `#include`, draw more than one flat colour, and take at most 15 times the work of the gallery's reference shader. You can run the same check yourself: `livewall.exe -check myshader.hlsl out.png` writes a picture and an `out.png.txt` with the result.
+
 ## On Linux
 
 Linux uses GLSL, the same language as Shadertoy, so most Shadertoy shaders work as they are. Save the shader as a `.glsl` (or `.frag`) file with a `mainImage(out vec4 fragColor, in vec2 fragCoord)` function and run `livewall -set file.glsl`. The inputs are the same: `iResolution`, `iTime`, `iMouse`. See [`examples/plasma.glsl`](../examples/plasma.glsl). `.hlsl` files only work on Windows. Compiler errors go to `~/.config/livewall/livewall.log`.
