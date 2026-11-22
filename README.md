@@ -59,7 +59,7 @@ Click a wallpaper to apply it. Drag your own files onto the window to add them. 
 
 The **Community** tab shows free wallpapers shared by other people in the [livewall gallery](https://github.com/manndevani/livewall-gallery). Click one to download it and use it, on the desktop or on the Lock screen tab. Each one is checked for viruses, tested and approved by a person before it shows up. The list of approved wallpapers is signed with a key that never leaves the maintainer's PC, and livewall checks that signature and every download's fingerprint (SHA-256) before using it. To share your own, see [how to add yours](https://github.com/manndevani/livewall-gallery/blob/main/SHARING.md).
 
-**Want a wallpaper from a game or film you love?** Drop its video, GIF or picture onto the Settings window, and livewall uses it on your PC. The gallery can only share wallpapers people made themselves, because game and film art belongs to the studios that made it.
+**Want a wallpaper from a game or film you love?** Drop its video, GIF or picture onto the Settings window, and livewall uses it on your PC. The gallery can only share wallpapers people made themselves, because game and film art belongs to the studios that made it. Fan art you drew or animated yourself is welcome there.
 
 ## Lock screen
 

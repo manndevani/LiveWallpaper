@@ -793,8 +793,9 @@ void draw_community()
         s.scroll_max = 0;
     s.scroll = clampf(s.scroll, 0, s.scroll_max);
 
-    /* Game wallpapers can't be shared in the gallery (they belong to the game
-       makers), but anyone can use one on their own PC. */
+    /* Art taken from games can't be shared in the gallery (it belongs to the
+       game makers; fan art people made themselves can), but anyone can use it
+       on their own PC. */
     float hy = g.top + PADG + rows * (ch + GAP) - s.scroll;
     if (hy >= g.top && hy + hint_h <= g.bottom)
         para(L"Want a wallpaper from a game or film you love? Drop its video, GIF or picture onto this window "
