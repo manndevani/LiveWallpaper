@@ -136,7 +136,7 @@ struct State {
     bool err_has;
 
     /* The Community gallery (gallery.c), filled by worker threads. */
-    int gstate;          /* 0 not loaded, 1 loading, 2 ready, 3 couldn't reach it */
+    int gstate;          /* 0 not loaded, 1 loading, 2 ready, 3 couldn't reach it, 4 its list failed the check */
     GalleryItem gitems[GALLERY_MAX];
     int gcount;
     struct {
@@ -773,10 +773,12 @@ void draw_community()
         gallery_load();
     if (s.gstate != 2) {
         float cy = (g.top + g.bottom) / 2;
-        para(s.gstate == 3 ? L"Couldn't reach the gallery. Check your internet connection and try again."
-                           : L"Loading the gallery\x2026",
+        para(s.gstate == 3   ? L"Couldn't reach the gallery. Check your internet connection and try again."
+             : s.gstate == 4 ? L"The gallery's list doesn't carry the right signature, so nothing from it is shown. "
+                               L"Please try again later."
+                             : L"Loading the gallery\x2026",
              R(g.left + 60, cy - 40, g.right - 60, cy), s.th.sub);
-        if (s.gstate == 3)
+        if (s.gstate >= 3)
             button(R((g.left + g.right) / 2 - 60, cy + 4, (g.left + g.right) / 2 + 60, cy + 34), L"\xE72C", L"Try again",
                    ID_GRETRY, false);
         return;
@@ -1790,9 +1792,12 @@ LRESULT CALLBACK proc(HWND h, UINT m, WPARAM w, LPARAM l)
             s.gcount = n;
             s.gstate = 2;
         } else {
-            s.gstate = 3;
+            s.gstate = n == -2 ? 4 : 3;
         }
-        log_line(L"gallery: %d wallpapers listed%s", n < 0 ? 0 : n, n < 0 ? L" (couldn't reach the gallery)" : L"");
+        log_line(L"gallery: %d wallpapers listed%s", n < 0 ? 0 : n,
+                 n == -2  ? L" (the signed list is missing, wrong or older than before)"
+                 : n < 0 ? L" (couldn't reach the gallery)"
+                         : L"");
         invalidate();
         return 0;
     }

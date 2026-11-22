@@ -57,7 +57,7 @@ Click a wallpaper to apply it. Drag your own files onto the window to add them. 
 
 ## Community wallpapers
 
-The **Community** tab shows free wallpapers shared by other people in the [livewall gallery](https://github.com/manndevani/livewall-gallery). Click one to download it and use it, on the desktop or on the Lock screen tab. Each one is checked for viruses, tested and approved by a person before it shows up, and livewall checks every download's fingerprint (SHA-256) before using it. To share your own, see [how to add yours](https://github.com/manndevani/livewall-gallery/blob/main/SHARING.md).
+The **Community** tab shows free wallpapers shared by other people in the [livewall gallery](https://github.com/manndevani/livewall-gallery). Click one to download it and use it, on the desktop or on the Lock screen tab. Each one is checked for viruses, tested and approved by a person before it shows up. The list of approved wallpapers is signed with a key that never leaves the maintainer's PC, and livewall checks that signature and every download's fingerprint (SHA-256) before using it. To share your own, see [how to add yours](https://github.com/manndevani/livewall-gallery/blob/main/SHARING.md).
 
 ## Lock screen
 

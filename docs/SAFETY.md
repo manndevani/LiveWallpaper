@@ -13,7 +13,9 @@ A live wallpaper runs all day, opens files that other people made, and sits next
 - Every gallery file is checked by a computer and then by a person before it is listed: it is opened and drawn by livewall itself, scanned with ClamAV, and videos, GIFs and pictures are rebuilt with ffmpeg so that only the picture data is kept.
 - livewall checks every download against a SHA-256 fingerprint from the gallery list and throws away a file that doesn't match. Downloads go over HTTPS only, and are saved under a name livewall makes itself (lowercase letters, numbers and dashes), so a list entry can't write anywhere else on your PC.
 
-**Still open.** The fingerprints come from the same place as the files. If someone took over the GitHub account, they could change both. Fix: sign the gallery list with a key that never leaves the maintainer's PC, and have livewall check the signature with Windows' own BCrypt. Until then, the GitHub account must have two-step sign-in turned on.
+- **The list is signed (2026-11-22).** The maintainer signs a short list of each approved wallpaper and the fingerprints of its file and preview (`signed.txt`), with a key kept in Windows' key store on the maintainer's PC. The key can't be copied out, and Windows asks for its password each time it signs. livewall has the public half built in, checks the signature with Windows' own BCrypt, and shows only wallpapers that are on the signed list with the same fingerprints. So even someone who took over the GitHub account couldn't add or change a wallpaper that livewall shows. livewall also remembers the last list it accepted and refuses an older one, so a wallpaper taken off the list can't be brought back by serving an old list.
+
+**Still open.** The GitHub account should still have two-step sign-in turned on: someone who took it over could take wallpapers off the gallery, though not add their own. If the signing key is lost, a new livewall release with a new key is needed.
 
 ### Files made to break the decoder
 

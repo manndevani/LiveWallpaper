@@ -5,9 +5,9 @@
  * log the results.
  *
  * Safety: downloads only over HTTPS from GALLERY_HOST, with size limits.
- * Every file is checked against the SHA-256 in index.json before it is
- * used, and saved under a name livewall makes itself, never one from the
- * download. WinHTTP and BCrypt are loaded on first use, so the wallpaper
+ * Only wallpapers in the maintainer's signed list are shown, and every file
+ * is checked against the SHA-256 in that list before it is used, and saved
+ * under a name livewall makes itself, never one from the download. WinHTTP and BCrypt are loaded on first use, so the wallpaper
  * engine process never loads them. */
 #pragma once
 #include "common.h"
@@ -47,9 +47,12 @@ typedef struct {
     DWORD likes;      /* upvotes on its post in the gallery's Discussions */
 } GalleryItem;
 
-/* Downloads and reads index.json. Returns the number of wallpapers, or -1
-   (no connection, or a list that doesn't follow the rules). Entries that
-   break a rule are left out. */
+/* Downloads and reads index.json and the maintainer's signed list
+   (signed.txt). Returns the number of wallpapers; -1 if the gallery can't be
+   reached or its list is broken; -2 if the signed list is missing, its
+   signature is wrong, or it is older than one seen before. Entries that
+   break a rule, or aren't in the signed list with the same fingerprints,
+   are left out. */
 int gallery_fetch(GalleryItem *items, int max);
 
 /* The preview picture, downloaded to gallery_preview_path if it isn't there

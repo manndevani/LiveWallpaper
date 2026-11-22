@@ -7,6 +7,21 @@
 #define INDEX_MAX (1u << 20)        /* index.json */
 #define PREVIEW_MAX (8u << 20)      /* a preview picture */
 #define FILE_MAX (60u << 20)        /* a wallpaper (the gallery allows up to 50 MB) */
+#define SIGNED_MAX (64u << 10)      /* signed.txt */
+
+/* The gallery maintainer's public signing keys: X and Y of an ECDSA P-256
+   key, as hex. `tools/sign.ps1 -NewKey` in the gallery repo makes a key and
+   prints this line. The private half never leaves the maintainer's PC, so
+   someone who takes over the GitHub account still can't add or change a
+   wallpaper that livewall will show. A second line is a spare key. */
+#define STR_(x) #x
+#define STR(x) STR_(x)
+static const char *const gallery_keys[] = {
+#ifdef LW_TEST_KEY /* test builds: a throwaway key */
+    STR(LW_TEST_KEY),
+#endif
+    NULL,
+};
 
 /* ---- WinHTTP and BCrypt, loaded on first use --------------------------- */
 
@@ -24,6 +39,10 @@ typedef NTSTATUS(WINAPI *CreateHashFn)(BCRYPT_ALG_HANDLE, BCRYPT_HASH_HANDLE *, 
 typedef NTSTATUS(WINAPI *HashDataFn)(BCRYPT_HASH_HANDLE, PUCHAR, ULONG, ULONG);
 typedef NTSTATUS(WINAPI *FinishFn)(BCRYPT_HASH_HANDLE, PUCHAR, ULONG, ULONG);
 typedef NTSTATUS(WINAPI *DestroyFn)(BCRYPT_HASH_HANDLE);
+typedef NTSTATUS(WINAPI *ImportFn)(BCRYPT_ALG_HANDLE, BCRYPT_KEY_HANDLE, LPCWSTR, BCRYPT_KEY_HANDLE *, PUCHAR, ULONG,
+                                   ULONG);
+typedef NTSTATUS(WINAPI *VerifyFn)(BCRYPT_KEY_HANDLE, VOID *, PUCHAR, ULONG, PUCHAR, ULONG, ULONG);
+typedef NTSTATUS(WINAPI *DestroyKeyFn)(BCRYPT_KEY_HANDLE);
 
 static struct {
     volatile LONG state; /* 0 not loaded, 1 loading, 2 ready, 3 failed */
@@ -40,7 +59,10 @@ static struct {
     HashDataFn hash_data;
     FinishFn finish;
     DestroyFn destroy;
-    BCRYPT_ALG_HANDLE sha256;
+    ImportFn import;
+    VerifyFn verify;
+    DestroyKeyFn destroy_key;
+    BCRYPT_ALG_HANDLE sha256, ecdsa;
     HINTERNET session;
 } api;
 
@@ -67,11 +89,16 @@ static BOOL load_api(void)
             api.hash_data = (HashDataFn)(void *)GetProcAddress(b, "BCryptHashData");
             api.finish = (FinishFn)(void *)GetProcAddress(b, "BCryptFinishHash");
             api.destroy = (DestroyFn)(void *)GetProcAddress(b, "BCryptDestroyHash");
+            api.import = (ImportFn)(void *)GetProcAddress(b, "BCryptImportKeyPair");
+            api.verify = (VerifyFn)(void *)GetProcAddress(b, "BCryptVerifySignature");
+            api.destroy_key = (DestroyKeyFn)(void *)GetProcAddress(b, "BCryptDestroyKey");
             ok = api.open && api.connect && api.request && api.send && api.receive && api.query && api.read &&
-                 api.close && api.timeouts && alg && api.create_hash && api.hash_data && api.finish && api.destroy;
+                 api.close && api.timeouts && alg && api.create_hash && api.hash_data && api.finish && api.destroy &&
+                 api.import && api.verify && api.destroy_key;
         }
         if (ok)
-            ok = alg(&api.sha256, BCRYPT_SHA256_ALGORITHM, NULL, 0) >= 0;
+            ok = alg(&api.sha256, BCRYPT_SHA256_ALGORITHM, NULL, 0) >= 0 &&
+                 alg(&api.ecdsa, BCRYPT_ECDSA_P256_ALGORITHM, NULL, 0) >= 0;
         if (ok) {
             /* 4 = WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY: the system's proxy settings. */
             api.session = api.open(L"livewall", 4, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
@@ -93,15 +120,24 @@ static BOOL load_api(void)
 
 typedef struct {
     BCRYPT_HASH_HANDLE h;
-    BOOL ok;
+    BOOL ok, made;
 } Hash;
 
-static void hash_begin(Hash *x) { x->ok = api.create_hash(api.sha256, &x->h, NULL, 0, NULL, 0, 0) >= 0; }
+static void hash_begin(Hash *x) { x->ok = x->made = api.create_hash(api.sha256, &x->h, NULL, 0, NULL, 0, 0) >= 0; }
 
 static void hash_add(Hash *x, const BYTE *p, DWORD n)
 {
     if (x->ok && n)
         x->ok = api.hash_data(x->h, (PUCHAR)p, n, 0) >= 0;
+}
+
+static BOOL hash_finish(Hash *x, BYTE d[32])
+{
+    BOOL ok = x->ok && api.finish(x->h, d, 32, 0) >= 0;
+    if (x->made)
+        api.destroy(x->h);
+    x->made = FALSE;
+    return ok;
 }
 
 /* Finishes and compares with the expected lowercase hex. */
@@ -110,9 +146,7 @@ static BOOL hash_matches(Hash *x, const char *hex)
     static const char digits[] = "0123456789abcdef";
     BYTE d[32];
     int i;
-    BOOL ok = x->ok && api.finish(x->h, d, 32, 0) >= 0;
-    api.destroy(x->h);
-    if (!ok)
+    if (!hash_finish(x, d))
         return FALSE;
     for (i = 0; i < 32; i++)
         if (hex[i * 2] != digits[d[i] >> 4] || hex[i * 2 + 1] != digits[d[i] & 15])
@@ -140,7 +174,7 @@ static BOOL file_matches(const WCHAR *path, const char *hex)
     CloseHandle(f);
     mem_free(buf);
     if (!buf || !ok) {
-        if (x.ok)
+        if (x.made)
             api.destroy(x.h);
         return FALSE;
     }
@@ -469,6 +503,200 @@ static BOOL jitem(Json *j, GalleryItem *it, BOOL *valid)
     return TRUE;
 }
 
+/* ---- signed.txt -------------------------------------------------------- */
+
+/* The maintainer's signed list of approved wallpapers (tools/sign.ps1 in the
+   gallery repo):
+       livewall gallery 1\n
+       seq <n>\n                          raised at every signing
+       <id> <sha256> <preview sha256>\n   one line per wallpaper
+       sig <128 hex>\n                    ECDSA P-256 over the SHA-256 of all above
+   index.json has the names, likes and so on and isn't signed (the likes
+   change every few hours). livewall shows only the wallpapers whose id and
+   both fingerprints are in this list. */
+
+#define SIGNED_ITEMS 512
+
+typedef struct {
+    char id[44], sha[65], psha[65];
+} SignedItem;
+
+static SignedItem signed_items[SIGNED_ITEMS];
+static int signed_count;
+
+static BOOL is_lhex(char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); }
+
+/* n bytes from 2n hex digits; stops at the first non-digit (or the end). */
+static BOOL hex_bytes(const char *s, BYTE *out, int n)
+{
+    int i, a, b;
+    for (i = 0; i < n; i++) {
+        if ((a = hexval(s[2 * i])) < 0 || (b = hexval(s[2 * i + 1])) < 0)
+            return FALSE;
+        out[i] = (BYTE)(a * 16 + b);
+    }
+    return TRUE;
+}
+
+/* TRUE if the SHA-256 of text[0..len) is signed by one of gallery_keys. */
+static BOOL signature_ok(const char *text, DWORD len, const char *sighex)
+{
+    BYTE digest[32], sig[64];
+    Hash x;
+    int k;
+    if (!hex_bytes(sighex, sig, 64))
+        return FALSE;
+    hash_begin(&x);
+    hash_add(&x, (const BYTE *)text, len);
+    if (!hash_finish(&x, digest))
+        return FALSE;
+    for (k = 0; gallery_keys[k]; k++) {
+        struct {
+            BCRYPT_ECCKEY_BLOB h;
+            BYTE xy[64];
+        } blob;
+        BCRYPT_KEY_HANDLE key = NULL;
+        BOOL good;
+        int n = 0;
+        while (n < 129 && gallery_keys[k][n])
+            n++;
+        if (n != 128 || !hex_bytes(gallery_keys[k], blob.xy, 64))
+            continue;
+        blob.h.dwMagic = BCRYPT_ECDSA_PUBLIC_P256_MAGIC;
+        blob.h.cbKey = 32;
+        if (api.import(api.ecdsa, NULL, BCRYPT_ECCPUBLIC_BLOB, &key, (PUCHAR)&blob, sizeof blob, 0) < 0)
+            continue;
+        good = api.verify(key, NULL, digest, 32, sig, 64, 0) >= 0;
+        api.destroy_key(key);
+        if (good)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+/* Reads signed.txt. With verify, also checks the signature. Fills items
+   (if given, up to SIGNED_ITEMS) and *seq. FALSE if anything is off. */
+static BOOL parse_signed(const char *t, DWORD len, BOOL verify, DWORD *seq, SignedItem *items, int *count)
+{
+    static const char head[] = "livewall gallery 1\nseq ";
+    const char *p, *end, *sig;
+    DWORD v = 0;
+    int n = 0, k;
+
+    if (len < (sizeof head - 1) + 2 + 5 + 128 + 1 || memcmp(t, head, sizeof head - 1) || t[len - 1] != '\n')
+        return FALSE;
+    sig = t + len - 1 - 128; /* the last line: "sig <hex>\n" */
+    if (memcmp(sig - 5, "\nsig ", 5))
+        return FALSE;
+    for (k = 0; k < 128; k++)
+        if (!is_lhex(sig[k]))
+            return FALSE;
+    end = sig - 4; /* the signed part ends with the '\n' before "sig" */
+    if (verify && !signature_ok(t, (DWORD)(end - t), sig))
+        return FALSE;
+
+    p = t + sizeof head - 1;
+    if (p >= end || *p < '0' || *p > '9')
+        return FALSE;
+    while (p < end && *p >= '0' && *p <= '9') {
+        if (v > 400000000)
+            return FALSE;
+        v = v * 10 + (DWORD)(*p++ - '0');
+    }
+    if (p >= end || *p++ != '\n')
+        return FALSE;
+    while (p < end) {
+        SignedItem it;
+        for (k = 0; p < end && *p != ' ' && k < 43; k++, p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-'))
+                return FALSE;
+            it.id[k] = *p;
+        }
+        it.id[k] = 0;
+        if (k < 3 || k > 40 || end - p < 1 + 64 + 1 + 64 + 1 || *p++ != ' ')
+            return FALSE;
+        for (k = 0; k < 64; k++, p++) {
+            if (!is_lhex(*p))
+                return FALSE;
+            it.sha[k] = *p;
+        }
+        it.sha[64] = 0;
+        if (*p++ != ' ')
+            return FALSE;
+        for (k = 0; k < 64; k++, p++) {
+            if (!is_lhex(*p))
+                return FALSE;
+            it.psha[k] = *p;
+        }
+        it.psha[64] = 0;
+        if (*p++ != '\n')
+            return FALSE;
+        if (items && n < SIGNED_ITEMS)
+            items[n++] = it;
+    }
+    *seq = v;
+    if (count)
+        *count = n;
+    return TRUE;
+}
+
+/* Downloads and checks signed.txt. A list older than the last one this PC
+   accepted (a lower seq) is refused, so an old list that still had a
+   wallpaper the maintainer has since taken off can't be served again. */
+static BOOL signed_fetch(void)
+{
+    WCHAR path[MAX_PATH];
+    BYTE *body = NULL, *old;
+    DWORD len = 0, seq = 0, oldseq = 0, got = 0;
+    HANDLE f;
+    BOOL ok;
+
+    signed_count = 0;
+    ok = http_get(L"signed.txt", &body, &len, SIGNED_MAX) &&
+         parse_signed((const char *)body, len, TRUE, &seq, signed_items, &signed_count);
+    if (ok) {
+        app_dir(path);
+        str_cat(path, L"\\gallery", MAX_PATH);
+        CreateDirectoryW(path, NULL);
+        str_cat(path, L"\\signed.txt", MAX_PATH);
+        f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        if (f != INVALID_HANDLE_VALUE) {
+            old = (BYTE *)mem_alloc(SIGNED_MAX);
+            if (old && ReadFile(f, old, SIGNED_MAX, &got, NULL) &&
+                parse_signed((const char *)old, got, FALSE, &oldseq, NULL, NULL) && seq < oldseq)
+                ok = FALSE;
+            mem_free(old);
+            CloseHandle(f);
+        }
+    }
+    if (ok) { /* remember it */
+        f = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (f != INVALID_HANDLE_VALUE) {
+            WriteFile(f, body, len, &got, NULL);
+            CloseHandle(f);
+        }
+    }
+    if (!ok)
+        signed_count = 0;
+    mem_free(body);
+    return ok;
+}
+
+static BOOL is_signed(const GalleryItem *it)
+{
+    int i, k;
+    for (i = 0; i < signed_count; i++) {
+        const SignedItem *s = &signed_items[i];
+        for (k = 0; s->id[k] && it->id[k] == (WCHAR)(BYTE)s->id[k]; k++)
+            ;
+        if (!s->id[k] && !it->id[k] && !memcmp(s->sha, it->sha, 64) && !memcmp(s->psha, it->psha, 64))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+/* ---- the list ---------------------------------------------------------- */
+
 int gallery_fetch(GalleryItem *items, int max)
 {
     BYTE *body;
@@ -480,6 +708,10 @@ int gallery_fetch(GalleryItem *items, int max)
 
     if (!http_get(L"index.json", &body, &len, INDEX_MAX))
         return -1;
+    if (!signed_fetch()) {
+        mem_free(body);
+        return -2;
+    }
     j.p = (const char *)body;
     j.end = j.p + len;
     j.depth = 0;
@@ -499,7 +731,7 @@ int gallery_fetch(GalleryItem *items, int max)
                                 break;
                         } else if (!jitem(&j, &items[n], &valid)) {
                             break;
-                        } else if (valid) {
+                        } else if (valid && is_signed(&items[n])) {
                             n++;
                         }
                         if (eat(&j, ']'))
