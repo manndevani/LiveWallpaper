@@ -428,6 +428,15 @@ static HRESULT sr_make_processor(void)
         hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(rp.en, DXGI_FORMAT_B8G8R8A8_UNORM, &f);
     if (SUCCEEDED(hr) && !(f & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
         hr = MF_E_UNSUPPORTED_D3D_TYPE;
+    /* Turning is optional for drivers (Microsoft's docs): without it, a
+       phone video goes to the media engine. */
+    if (SUCCEEDED(hr) && rp.rot) {
+        D3D11_VIDEO_PROCESSOR_CAPS caps;
+        memset(&caps, 0, sizeof caps);
+        if (FAILED(ID3D11VideoProcessorEnumerator_GetVideoProcessorCaps(rp.en, &caps)) ||
+            !(caps.FeatureCaps & D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_ROTATION))
+            hr = MF_E_UNSUPPORTED_D3D_TYPE;
+    }
     /* Can it convert this colour space (HDR, say) to ordinary screen colour?
        If not, the media engine may know how. */
     if (SUCCEEDED(hr) && rp.vctx1 &&
