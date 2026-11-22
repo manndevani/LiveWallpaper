@@ -786,11 +786,20 @@ void draw_community()
 
     UINT tiles = (UINT)s.gcount + 1; /* + "share your own" */
     UINT rows = (tiles + COLS - 1) / COLS;
-    float content = PADG + rows * ch + (rows - 1) * GAP + PADG;
+    const float hint_h = 40; /* the line under the cards */
+    float content = PADG + rows * ch + (rows - 1) * GAP + GAP + hint_h + PADG;
     s.scroll_max = content - (g.bottom - g.top);
     if (s.scroll_max < 0)
         s.scroll_max = 0;
     s.scroll = clampf(s.scroll, 0, s.scroll_max);
+
+    /* Game wallpapers can't be shared in the gallery (they belong to the game
+       makers), but anyone can use one on their own PC. */
+    float hy = g.top + PADG + rows * (ch + GAP) - s.scroll;
+    if (hy >= g.top && hy + hint_h <= g.bottom)
+        para(L"Want a wallpaper from a game or film you love? Drop its video, GIF or picture onto this window "
+             L"to use it on your own PC.",
+             R(PADG, hy, g.right - PADG, hy + hint_h), s.th.faint);
 
     for (UINT k = 0; k < tiles; k++) {
         float x = PADG + (k % COLS) * (cw + GAP);
