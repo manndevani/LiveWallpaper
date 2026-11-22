@@ -349,6 +349,14 @@ static void load_source(BOOL fallback)
     }
     e.src = s;
     update_interval();
+    /* A switch can leave the old wallpaper's memory behind (a video's
+       decoder, ~15 MB): hand it back soon, also while paused. */
+    {
+        LARGE_INTEGER now;
+        QueryPerformanceCounter(&now);
+        e.idle_since = now.QuadPart;
+        e.trimmed = FALSE;
+    }
     /* Re-evaluate running for the new source (and start/stop its decoder). */
     e.running = FALSE;
     CancelWaitableTimer(e.timer);
