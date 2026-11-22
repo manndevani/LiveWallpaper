@@ -41,6 +41,7 @@ typedef struct {
     UINT ww, wh;     /* window size */
     UINT bw, bh;     /* back buffer size */
     UINT scale;
+    UINT fix_w, fix_h; /* back buffer size a source asked for (gfx_content_size), 0 = none */
     UINT ease;       /* extra resolution divider from the speed guard (0 or 1 = none) */
     double gpu_sum;  /* GPU seconds of the frames timed since the engine last reset it */
     UINT gpu_n;      /* how many frames that is */
@@ -50,6 +51,7 @@ typedef struct {
 extern Gfx gfx;
 extern Fit source_fit;     /* how images and video fill the screen */
 extern float source_speed; /* playback speed, 1 = normal */
+extern UINT source_fps;    /* the frame cap: videos show at most this many frames a second */
 
 float phase_at(double t);
 
@@ -58,6 +60,7 @@ void gfx_free(void);
 BOOL gfx_attach(HWND wnd, UINT w, UINT h, UINT scale);
 void gfx_detach(void);
 BOOL gfx_resize(UINT w, UINT h, UINT scale);
+BOOL gfx_content_size(UINT cw, UINT ch); /* see gfx.c */
 
 void gfx_consts(FrameConsts *c, const FrameInfo *f);
 void gfx_fit(UINT cw, UINT ch, Fit fit, float out[4]);

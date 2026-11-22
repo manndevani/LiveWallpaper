@@ -346,6 +346,7 @@ static void load_source(BOOL fallback)
     e.has_click = FALSE;
     source_fit = cfg.fit;
     source_speed = cfg.speed / 100.0f;
+    source_fps = cfg.fps;
 
     /* A wallpaper that made Windows reset the graphics card twice (a shader
        too heavy for this GPU) isn't loaded again: each reset freezes the
@@ -599,6 +600,7 @@ static void reload(void)
     update_hotkey();
     source_fit = cfg.fit;
     source_speed = cfg.speed / 100.0f;
+    source_fps = cfg.fps;
     if (e.still && str_ieq(prev, cfg.current)) {
         if (fit != cfg.fit || bright != cfg.brightness)
             load_source(FALSE); /* hand the picture over again with the new look */

@@ -62,7 +62,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 
 `MsgWaitForMultipleObjectsEx` waits on a high-resolution waitable timer, and the timer is armed only while something animates. A still image draws once, and then the engine just sleeps.
 
-- **Frame tick** (`fps` from the config; 60 for video, which presents only when a new frame arrives) → `render()`.
+- **Frame tick** (`fps` from the config; 60 for video, which presents only when a new frame arrives, and no more often than the `fps` cap, through `source_fps`) → `render()`.
 - **Poll** (500 ms, coalescable timer): attach or re-attach to the desktop, fix the z-order, check whether the desktop is covered, resize, check the source for failure, update the fps counter.
 - **Pause reasons** (any one stops the frame timer and video playback):
   - user pause;
@@ -84,7 +84,7 @@ IPC uses registered window messages to the engine's hidden window (class `livewa
 
 - One swap chain covers the whole virtual desktop: FLIP_DISCARD with `DXGI_SCALING_STRETCH`.
 - Shader resolution is chosen from the display by default (`resolution=0`, Auto): 1:1 up to 2560×1600 pixels, and 1/2 or less on bigger desktops (4K, wide multi-monitor), where DWM upscales for free. Full (`1`) and Half (`2`) can be picked in settings.
-- Video and images always render at full resolution.
+- Video and images ignore the shader resolution setting. A video that the fit mode would stretch up (smaller than the screen) asks for a back buffer at its own size with `gfx_content_size`, and DWM stretches it. `TransferVideoFrame` then only converts colours, and every frame is presented at the smaller size. `v_close` forgets the size, and the next `gfx_resize` goes back to the window size.
 - `FrameConsts` (64 bytes) carries:
   - resolution;
   - `phase` (loops every 120 s) and `time`;

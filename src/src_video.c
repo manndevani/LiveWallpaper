@@ -22,6 +22,8 @@ static volatile LONG broken;
 static BOOL started;
 static WCHAR parked_path[MAX_PATH]; /* see v_park */
 static double parked_at;
+static LONGLONG shown_at; /* when the last frame was shown (QPC), for the frame cap */
+static LARGE_INTEGER qpf;
 
 /* ---- the one callback interface Media Foundation needs, by hand in C --- */
 
@@ -67,6 +69,10 @@ static void v_close(void)
     if (started)
         MFShutdown();
     started = FALSE;
+    shown_at = 0;
+    /* Forget the video's buffer size; the engine resizes for whatever comes
+       next (and v_draw asks again after a park). */
+    gfx.fix_w = gfx.fix_h = 0;
 }
 
 static BOOL v_open(const WCHAR *path, SourceInfo *info)
@@ -153,14 +159,29 @@ static BOOL v_draw(const FrameInfo *f, BOOL force)
     DWORD w = 0, h = 0;
     float o[4], u0, v0, u1, v1;
     RECT dst;
+    LARGE_INTEGER now;
     (void)f;
 
     if (!eng || !gfx.backbuf)
         return FALSE;
     if (IMFMediaEngine_OnVideoStreamTick(eng, &pts) != S_OK && !force)
         return FALSE; /* no new frame */
+    /* The frame cap: a 60 fps video (or a 30 fps one at double speed) with
+       the cap at 30 shows every other frame. Converting and presenting a
+       frame costs about as much as decoding it. The 3/4 leaves room for
+       timer jitter, so a video at the cap keeps every frame. */
+    QueryPerformanceCounter(&now);
+    if (!qpf.QuadPart)
+        QueryPerformanceFrequency(&qpf);
+    if (!force && source_fps && shown_at && now.QuadPart - shown_at < qpf.QuadPart * 3 / (4 * (LONGLONG)source_fps))
+        return FALSE;
     if (FAILED(IMFMediaEngine_GetNativeVideoSize(eng, &w, &h)) || !w || !h)
         return FALSE;
+    /* A video smaller than the screen is drawn at its own size and the
+       compositor stretches it (gfx_content_size). */
+    if (!gfx_content_size(w, h) || !gfx.backbuf)
+        return FALSE;
+    shown_at = now.QuadPart;
 
     /* Map the fit mode onto a source crop and a destination rectangle. */
     gfx_fit(w, h, source_fit, o);

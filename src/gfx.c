@@ -18,6 +18,7 @@ static struct {
 static UINT time_next;
 static BOOL time_open; /* begin was issued for times[time_next] */
 float source_speed = 1.0f;
+UINT source_fps = 30;
 
 float phase_at(double t)
 {
@@ -229,6 +230,10 @@ static void set_sizes(UINT w, UINT h, UINT scale)
     gfx.scale = pick_scale(w, h, scale);
     gfx.bw = max(1, (w + gfx.scale - 1) / gfx.scale);
     gfx.bh = max(1, (h + gfx.scale - 1) / gfx.scale);
+    if (gfx.fix_w && gfx.fix_h) { /* the source asked for its own size (gfx_content_size) */
+        gfx.bw = min(gfx.fix_w, w);
+        gfx.bh = min(gfx.fix_h, h);
+    }
 }
 
 static BOOL make_views(void)
@@ -281,16 +286,44 @@ void gfx_detach(void)
 
 BOOL gfx_resize(UINT w, UINT h, UINT scale)
 {
+    UINT bw = gfx.bw, bh = gfx.bh;
     if (!gfx.sc)
         return FALSE;
-    if (w == gfx.ww && h == gfx.wh && pick_scale(w, h, scale) == gfx.scale)
-        return TRUE;
+    set_sizes(w, h, scale);
+    if (gfx.backbuf && gfx.bw == bw && gfx.bh == bh)
+        return TRUE; /* same buffer: nothing to rebuild */
     gfx_unbind();
     RELEASE(gfx.rtv);
     RELEASE(gfx.backbuf);
-    set_sizes(w, h, scale);
     return SUCCEEDED(IDXGISwapChain1_ResizeBuffers(gfx.sc, 0, gfx.bw, gfx.bh, DXGI_FORMAT_UNKNOWN, 0)) &&
            make_views();
+}
+
+/* Content of cw x ch (a video) that the fit mode would stretch up to fill
+   the screen gets a back buffer at its own size instead: the compositor
+   stretches it for free, as it does for half-resolution shaders, and every
+   frame is converted and presented at the smaller size. Content as big as
+   the screen or bigger keeps the full-size buffer. 0 x 0 forgets it (the
+   next gfx_resize goes back to the window size). */
+BOOL gfx_content_size(UINT cw, UINT ch)
+{
+    float sx, sy;
+    UINT fw = 0, fh = 0;
+    if (cw && ch && gfx.ww && gfx.wh) {
+        sx = (float)gfx.ww / (float)cw; /* screen pixels per content pixel */
+        sy = (float)gfx.wh / (float)ch;
+        if (source_fit != FIT_STRETCH) /* cover and contain keep the shape: one scale */
+            sx = sy = source_fit == FIT_COVER ? (sx > sy ? sx : sy) : (sx < sy ? sx : sy);
+        fw = sx > 1.0f ? (UINT)((float)gfx.ww / sx + 0.5f) : gfx.ww;
+        fh = sy > 1.0f ? (UINT)((float)gfx.wh / sy + 0.5f) : gfx.wh;
+        if (fw >= gfx.ww && fh >= gfx.wh)
+            fw = fh = 0; /* not smaller: the normal size */
+    }
+    if (fw == gfx.fix_w && fh == gfx.fix_h)
+        return TRUE;
+    gfx.fix_w = fw;
+    gfx.fix_h = fh;
+    return !gfx.sc || gfx_resize(gfx.ww, gfx.wh, 1); /* only full-resolution sources use this */
 }
 
 void gfx_consts(FrameConsts *c, const FrameInfo *f)

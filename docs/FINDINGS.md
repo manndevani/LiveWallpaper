@@ -132,8 +132,14 @@ So the engine now trims once **5 s after drawing starts** (`trim_memory` in engi
 - Shader cost is almost the same whichever shader is used. Present and composition dominate, not the pixel shader.
 - **Video is by far the most expensive type.**
   - The Media Foundation pipeline adds ~45 MB and ~10 threads.
-  - `TransferVideoFrame` color-converts and scales every frame to the full back buffer.
+  - `TransferVideoFrame` color-converts and scales every frame to the full back buffer. Since 2026-11-22 it skips the scaling for a video smaller than the screen; see below.
   - It is still small next to any browser tab, and it pauses like everything else.
+- **Where video time goes on the graphics card** (2026-11-22, generated H.264 test files, 1920×1080, engine on the Intel GPU). Split by engine type from `\GPU Engine(pid_*_engtype_*)\Running Time`:
+  - The `videodecode` engine takes 230–600 ms per second, and the `3d` engine (colour conversion, scaling, present) takes 90–150 ms per second.
+  - Decoding is the larger part, and only the file decides it. The numbers jump between runs because the card changes its own clock, so compare builds in alternating runs.
+  - 720p drawn into a 1280×720 buffer instead of a 1920×1080 one: 3d time 133–135 → 79–85 ms/s.
+  - A 60 fps video held to a 30 fps cap: 3d time 87–94 → 39 ms/s, CPU 0.94% → 0.70%. Skipping a frame after `OnVideoStreamTick` returned `S_OK` is fine; the next call reports the next new frame.
+  - A 640×480 or 720p test video encoded with the MF Sink Writer is a quick C program (`MFCreateSinkWriterFromURL`, RGB32 in, H.264 out). In C, `MFSetAttributeSize` and `MFSetAttributeRatio` don't exist (they are C++ inline helpers); set `MF_MT_FRAME_SIZE` and the ratios with `SetUINT64((hi << 32) | lo)`.
 - The settings process used ~18 MB while open, and 0 once closed. Since 2026-11-20 it hands memory back once thumbnails are built and the window has had no input for 3 s, or as soon as it goes to the background. It is ~19 MB for the first second or two, then ~3–4 MB while open (sampled every second with the window in front). Drawing it with Direct2D's software renderer instead was worse: it held ~9.6 MB, because it keeps and redraws a full CPU copy of the window every second (the fps readout).
 - Exe size: ~114 KB, everything included (~94 KB before the Explorer icon was added on 2026-11-20; the icon is PNG entries 16–128 px, about 20 KB, and the 256 px size alone would have added another ~26 KB). The engine-only v1 was 16 KB.
 

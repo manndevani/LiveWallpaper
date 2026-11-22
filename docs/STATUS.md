@@ -48,6 +48,12 @@ Last updated: 2026-11-22
     - The Settings footer then says so in amber: "lowered: this shader is heavy for your graphics card". The level resets when another wallpaper is chosen.
     - Checked with made-up test shaders. One at 27% busy was left alone. One at 98% busy (16 fps) went to half resolution and settled at 46% busy, 28 fps.
     - Built-ins cost far less: Aurora takes 0.06 ms per frame.
+- [x] Cheaper video drawing (2026-11-22). Checked with generated test videos on the 1920×1080 screen, old build against new, two runs each:
+  - A video smaller than the screen gets a buffer at its own size, and Windows stretches it, as with half-resolution shaders. A 720p video draws into 1280×720, and the drawing time on the graphics card falls from 133–135 to 79–85 ms per second.
+  - Videos follow the frame cap. A 60 fps video with the cap at 30 now shows 29 fps instead of 59, and its drawing time falls from 87–94 to 39 ms per second.
+  - Decoding costs the same as before; the file decides that.
+  - Buffer sizes checked for every fit mode: 720p is 1280×720 in all three. A 4:3 640×480 video is 640×360 when it fills the screen and 853×480 with black bars. Going back to a shader returns to 1920×1080, and `-snapshot` of a video still works.
+  - Not yet looked at on the real desktop by eye. Windows' stretch is a simple one, so a small video may look a little softer than before.
   - Drag and drop onto Settings adds files to the library (a folder and a `.txt` were skipped, a shader and a video added). Checked with a test build that fakes the drop (`-DLW_TEST_DROP=1`); **not yet dragged by hand** from File Explorer.
 
 ## Lock screen on Windows (screen saver, 2026-11-20)
@@ -131,5 +137,4 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
   - iOS: export a video or Live Photo only.
 
 - Per-monitor wallpapers (one swap chain per monitor).
-- Reduce video cost: decode at the source size and let DWM scale, as the shaders do.
 - An installer or "copy to %LOCALAPPDATA%" option so the task doesn't point into a build folder.

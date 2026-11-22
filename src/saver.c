@@ -162,6 +162,7 @@ static BOOL open_source(void)
     Kind k = kind_of(id);
     source_fit = cfg.fit;
     source_speed = cfg.speed / 100.0f;
+    source_fps = cfg.fps;
     memset(&v.info, 0, sizeof v.info);
     if (k != KIND_UNKNOWN) {
         v.src = source_for(k);
