@@ -76,7 +76,8 @@ static bool x_init(void)
 
 static int x_fd(void) { return ConnectionNumber(dpy); }
 
-static void x_dispatch(bool readable)
+/* Xlib exits the program by itself when the connection is lost. */
+static bool x_dispatch(bool readable)
 {
     (void)readable;
     while (XPending(dpy)) {
@@ -92,6 +93,7 @@ static void x_dispatch(bool readable)
         }
     }
     XFlush(dpy);
+    return true;
 }
 
 static int x_outputs(void) { return 1; }

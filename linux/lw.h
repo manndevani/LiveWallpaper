@@ -32,6 +32,7 @@ typedef struct {
     int brightness;         /* percent */
     Fit fit;
     bool pause_covered, pause_battery, autostart;
+    char lock[PATH_LEN];    /* lock screen wallpaper; "" = the same as the desktop */
     int lib_count;
     char lib[LIB_MAX][PATH_LEN];
 } Config;
@@ -85,7 +86,8 @@ bool png_write(const char *path, const uint8_t *rgba, int w, int h);
 typedef struct {
     bool (*init)(void);
     int  (*fd)(void);                  /* poll() this */
-    void (*dispatch)(bool readable);   /* readable: fd had data; false: just flush before polling */
+    bool (*dispatch)(bool readable);   /* readable: fd had data; false: just flush before polling.
+                                          Returns false when the connection to the desktop is gone. */
     int  (*outputs)(void);             /* number of surfaces to draw */
     bool (*begin)(int i, int *w, int *h); /* make surface i current; false = skip it now */
     void (*end)(int i);                 /* swap */

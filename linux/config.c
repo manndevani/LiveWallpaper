@@ -111,6 +111,8 @@ bool config_load(Config *c)
             else if (!strcmp(k, "pause_when_covered")) c->pause_covered = n != 0;
             else if (!strcmp(k, "pause_on_battery")) c->pause_battery = n != 0;
             else if (!strcmp(k, "autostart")) c->autostart = n != 0;
+        } else if (!strcmp(section, "lockscreen")) {
+            if (!strcmp(k, "wallpaper")) snprintf(c->lock, sizeof c->lock, "%s", v);
         } else if (!strcmp(section, "library")) {
             if (!strncmp(k, "item", 4) && c->lib_count < LIB_MAX)
                 snprintf(c->lib[c->lib_count++], PATH_LEN, "%s", v);
@@ -131,6 +133,7 @@ void config_save(const Config *c)
             c->current, (int)c->fit, c->speed, c->brightness);
     fprintf(f, "[engine]\nfps=%d\nresolution=%d\npause_when_covered=%d\npause_on_battery=%d\nautostart=%d\n\n",
             c->fps, c->resolution, c->pause_covered, c->pause_battery, c->autostart);
+    if (c->lock[0]) fprintf(f, "[lockscreen]\nwallpaper=%s\n\n", c->lock);
     fprintf(f, "[library]\ncount=%d\n", c->lib_count);
     for (int i = 0; i < c->lib_count; i++) fprintf(f, "item%d=%s\n", i, c->lib[i]);
     fclose(f);

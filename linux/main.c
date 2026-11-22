@@ -8,6 +8,9 @@
  *   livewall -autostart on|off   start with the desktop or not
  *   livewall -quit               stop the wallpaper
  *   livewall -snapshot <id|file> <out.png> [seconds] [WxH]   render one frame offscreen
+ *   livewall -lock [-f]          lock through swaylock-plugin (live) or the desktop's locker
+ *   livewall -lockbg             the lock screen background, run by swaylock-plugin
+ *   livewall -lock-set <id|same> / -lock-picture [out.png] [WxH]
  *
  * The running engine re-reads config.ini on SIGHUP; the commands above write
  * the file and then send it. */
@@ -241,19 +244,34 @@ static void arm(int tfd, double interval)
     timerfd_settime(tfd, 0, &it, NULL);
 }
 
-static int engine_run(bool quiet)
+/* The lock screen background (-lockbg) shows the lock wallpaper instead. */
+static bool lock_bg;
+
+static void load_config(void)
 {
-    (void)quiet;
-    if (running_pid() > 0) return 0; /* already running: nothing to do */
-    if (!take_lock()) return 0;
-    bool first = !config_load(&E.cfg);
-    if (first) config_save(&E.cfg);
-    if (first && E.cfg.autostart) set_autostart(true);
+    config_load(&E.cfg);
+    if (lock_bg && E.cfg.lock[0]) snprintf(E.cfg.current, sizeof E.cfg.current, "%s", E.cfg.lock);
+}
+
+/* lockbg: run as the background of a screen locker (swaylock-plugin runs us
+   inside its own small Wayland server). No single-instance lock, no
+   autostart, and we exit when the locker closes its server on unlock. */
+static int engine_run(bool lockbg)
+{
+    lock_bg = lockbg;
+    if (!lockbg) {
+        if (running_pid() > 0) return 0; /* already running: nothing to do */
+        if (!take_lock()) return 0;
+        bool first = !config_load(&E.cfg);
+        if (first) config_save(&E.cfg);
+        if (first && E.cfg.autostart) set_autostart(true);
+    }
+    load_config();
 
     const char *wl = getenv("WAYLAND_DISPLAY"), *x = getenv("DISPLAY");
     B = NULL;
     if (wl && *wl && wayland_backend.init()) B = &wayland_backend;
-    else if (x && *x && x11_backend.init()) B = &x11_backend;
+    else if (!lockbg && x && *x && x11_backend.init()) B = &x11_backend;
     if (!B) {
         fprintf(stderr, "livewall: can't draw behind the desktop here (see ~/.config/livewall/livewall.log)\n");
         lw_log("no usable desktop (needs Wayland with layer-shell, or X11)");
@@ -293,13 +311,15 @@ static int engine_run(bool quiet)
         bool want_timer = !E.paused && E.kind != KIND_MEDIA && E.shader && !B->waiting();
         if (want_timer != timer_on) { arm(tfd, want_timer ? 1.0 / E.cfg.fps : 0); timer_on = want_timer; E.last = now; }
 
-        B->dispatch(false);
+        if (!B->dispatch(false)) break;
         struct pollfd pf[4] = {{B->fd(), POLLIN, 0}, {sfd, POLLIN, 0}, {tfd, POLLIN, 0}, {wake_fd, POLLIN, 0}};
         int timeout = (int)((next_poll - now) * 1000) + 1;
         if (poll(pf, 4, timeout < 1 ? 1 : timeout) < 0 && errno != EINTR) break;
         now = now_s();
 
-        if (pf[0].revents & POLLIN) B->dispatch(true);
+        /* A closed connection (the desktop or the locker went away) ends the
+           loop; without this, poll() would report it forever and spin. */
+        if ((pf[0].revents & (POLLIN | POLLHUP | POLLERR)) && !B->dispatch(true)) break;
         if (pf[1].revents & POLLIN) {
             struct signalfd_siginfo si;
             if (read(sfd, &si, sizeof si) == sizeof si) {
@@ -307,7 +327,7 @@ static int engine_run(bool quiet)
                     char old[PATH_LEN];
                     Fit old_fit = E.cfg.fit;
                     snprintf(old, sizeof old, "%s", E.cfg.current);
-                    config_load(&E.cfg);
+                    load_config();
                     if (strcmp(old, E.cfg.current) || (E.kind == KIND_MEDIA && old_fit != E.cfg.fit)) open_wallpaper();
                     if (E.kind == KIND_MEDIA) media_pause(E.paused);
                     timer_on = false; /* re-arm with the new fps */
@@ -427,7 +447,70 @@ static int snapshot(const char *id, const char *out, double at, int w, int h)
     return ok ? 0 : 1;
 }
 
+/* ---- lock screen -------------------------------------------------------- */
+/* livewall never asks for or checks a password: locking is always done by a
+   real screen locker. With swaylock-plugin the locker draws the password
+   box over livewall (run as its background with -lockbg); otherwise the
+   desktop's own lock screen is used. */
+
+static bool on_path(const char *prog)
+{
+    char buf[PATH_LEN];
+    for (const char *p = getenv("PATH"); p && *p; ) {
+        size_t n = strcspn(p, ":");
+        snprintf(buf, sizeof buf, "%.*s/%s", (int)n, p, prog);
+        if (n && access(buf, X_OK) == 0) return true;
+        p += n + (p[n] == ':');
+    }
+    return false;
+}
+
+static int lock_now(int argc, char **argv)
+{
+    const char *wl = getenv("WAYLAND_DISPLAY");
+    if (wl && *wl && on_path("swaylock-plugin")) {
+        static char exe[PATH_MAX], cmd[PATH_MAX * 4 + 32];
+        char *o = cmd;
+        ssize_t len = readlink("/proc/self/exe", exe, sizeof exe - 1);
+        if (len <= 0) return 1;
+        exe[len] = 0;
+        /* swaylock-plugin runs --command through the shell: quote our path. */
+        *o++ = '\'';
+        for (const char *s = exe; *s; s++) {
+            if (*s == '\'') { memcpy(o, "'\\''", 4); o += 4; }
+            else *o++ = *s;
+        }
+        snprintf(o, sizeof cmd - (size_t)(o - cmd), "' -lockbg");
+        char *args[64];
+        int n = 0;
+        args[n++] = "swaylock-plugin";
+        for (int i = 2; i < argc && n < 60; i++) args[n++] = argv[i]; /* e.g. -f to return at once */
+        args[n++] = "--command";
+        args[n++] = cmd;
+        args[n] = NULL;
+        execvp(args[0], args);
+        perror("livewall: swaylock-plugin");
+    }
+    fprintf(stderr, "livewall: locking with your desktop's own lock screen. For the live wallpaper on the\n"
+                    "lock screen (Sway, Hyprland and similar), install swaylock-plugin: see docs/LINUX.md.\n");
+    execlp("loginctl", "loginctl", "lock-session", (char *)NULL);
+    perror("livewall: loginctl");
+    return 1;
+}
+
 /* ---- commands ----------------------------------------------------------- */
+
+/* "dunes" -> builtin:dunes; a relative file -> its full path. */
+static void resolve_id(const char *arg, char *id, size_t n)
+{
+    if (!strchr(arg, '/') && !strchr(arg, '.') && strncmp(arg, "builtin:", 8))
+        snprintf(id, n, "builtin:%s", arg);
+    else if (arg[0] != '/' && strncmp(arg, "builtin:", 8)) {
+        char *abs = realpath(arg, NULL);
+        snprintf(id, n, "%s", abs ? abs : arg);
+        free(abs);
+    } else snprintf(id, n, "%s", arg);
+}
 
 static void usage(void)
 {
@@ -442,6 +525,10 @@ static void usage(void)
          "  livewall -pause / -resume\n"
          "  livewall -autostart on|off   start with the desktop\n"
          "  livewall -quit               stop the wallpaper\n"
+         "  livewall -lock [-f]          lock now, with the live wallpaper if swaylock-plugin is installed\n"
+         "                               (-f: return right away; use it from swayidle or hypridle)\n"
+         "  livewall -lock-set <id|file|same>   the lock screen wallpaper (same = as the desktop)\n"
+         "  livewall -lock-picture [out.png] [WxH]   a still picture of it, for swaylock -i or hyprlock\n"
          "  livewall -snapshot <id|file> <out.png> [seconds] [WxH]");
 }
 
@@ -458,7 +545,7 @@ int main(int argc, char **argv)
     while (*cmd == '-') cmd++;
     Config c;
 
-    if (!*cmd || !strcmp(cmd, "startup")) return engine_run(!strcmp(cmd, "startup"));
+    if (!*cmd || !strcmp(cmd, "startup")) return engine_run(false);
     if (!strcmp(cmd, "help") || !strcmp(cmd, "h") || !strcmp(cmd, "version")) { usage(); return 0; }
     if (!strcmp(cmd, "quit")) {
         pid_t pid = running_pid();
@@ -476,20 +563,46 @@ int main(int argc, char **argv)
         for (int i = 0; i < c.lib_count; i++) printf("%s %s\n", strcmp(c.current, c.lib[i]) ? " " : "*", c.lib[i]);
         return 0;
     }
-    if (!strcmp(cmd, "set") && argc > 2) {
+    if ((!strcmp(cmd, "set") || !strcmp(cmd, "lock-set")) && argc > 2) {
         char id[PATH_LEN];
-        if (!strchr(argv[2], '/') && !strchr(argv[2], '.') && strncmp(argv[2], "builtin:", 8))
-            snprintf(id, sizeof id, "builtin:%s", argv[2]); /* "livewall -set dunes" */
-        else if (argv[2][0] != '/' && strncmp(argv[2], "builtin:", 8)) {
-            char *abs = realpath(argv[2], NULL);
-            snprintf(id, sizeof id, "%s", abs ? abs : argv[2]);
-            free(abs);
-        } else snprintf(id, sizeof id, "%s", argv[2]);
-        if (kind_of(id) == KIND_UNKNOWN) { fprintf(stderr, "livewall: don't know how to show %s\n", argv[2]); return 1; }
+        bool lock = !strcmp(cmd, "lock-set");
         config_load(&c);
-        snprintf(c.current, sizeof c.current, "%s", id);
+        if (lock && !strcmp(argv[2], "same")) { /* the lock screen follows the desktop */
+            c.lock[0] = 0;
+            config_save(&c);
+            return 0;
+        }
+        resolve_id(argv[2], id, sizeof id);
+        if (kind_of(id) == KIND_UNKNOWN) { fprintf(stderr, "livewall: don't know how to show %s\n", argv[2]); return 1; }
+        if (lock) snprintf(c.lock, sizeof c.lock, "%s", id);
+        else snprintf(c.current, sizeof c.current, "%s", id);
         if (strncmp(id, "builtin:", 8)) lib_add(&c, id);
+        if (lock) { config_save(&c); return 0; } /* read by the next -lock */
         return set_and_reload(&c);
+    }
+    if (!strcmp(cmd, "lock")) return lock_now(argc, argv);
+    if (!strcmp(cmd, "lockbg")) return engine_run(true);
+    if (!strcmp(cmd, "lock-picture")) {
+        /* A still picture of the lock wallpaper, for lockers that take a
+           picture (swaylock -i, hyprlock's background path). */
+        char out[PATH_LEN], dir[PATH_LEN];
+        int w = 1920, h = 1080;
+        config_load(&c);
+        if (argc > 2) snprintf(out, sizeof out, "%s", argv[2]);
+        else {
+            const char *x = getenv("XDG_CACHE_HOME"), *home = getenv("HOME");
+            if (x && *x) snprintf(dir, sizeof dir, "%s", x);
+            else snprintf(dir, sizeof dir, "%s/.cache", home ? home : ".");
+            mkdir(dir, 0700); /* ~/.cache (or XDG_CACHE_HOME) may not exist yet */
+            strncat(dir, "/livewall", sizeof dir - strlen(dir) - 1);
+            mkdir(dir, 0755);
+            snprintf(out, sizeof out, "%s/lock.png", dir);
+        }
+        if (argc > 3) sscanf(argv[3], "%dx%d", &w, &h);
+        if (w < 16 || h < 16 || w > 7680 || h > 4320) { fprintf(stderr, "livewall: size must be between 16x16 and 7680x4320\n"); return 1; }
+        int r = snapshot(c.lock[0] ? c.lock : c.current, out, 8.0, w, h);
+        if (!r) puts(out);
+        return r;
     }
     if ((!strcmp(cmd, "speed") || !strcmp(cmd, "brightness") || !strcmp(cmd, "fps") || !strcmp(cmd, "resolution")) && argc > 2) {
         config_load(&c);
@@ -514,9 +627,7 @@ int main(int argc, char **argv)
     }
     if (!strcmp(cmd, "snapshot") && argc > 3) {
         char id[PATH_LEN];
-        if (!strchr(argv[2], '/') && !strchr(argv[2], '.') && strncmp(argv[2], "builtin:", 8))
-            snprintf(id, sizeof id, "builtin:%s", argv[2]);
-        else snprintf(id, sizeof id, "%s", argv[2]);
+        resolve_id(argv[2], id, sizeof id);
         int w = 960, h = 540;
         if (argc > 5) sscanf(argv[5], "%dx%d", &w, &h);
         return snapshot(id, argv[3], argc > 4 ? atof(argv[4]) : 9.0, w, h);

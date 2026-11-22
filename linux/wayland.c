@@ -236,11 +236,15 @@ static bool w_init(void)
 
 static int w_fd(void) { return wl_display_get_fd(dpy); }
 
-static void w_dispatch(bool readable)
+static bool w_dispatch(bool readable)
 {
-    if (readable) wl_display_dispatch(dpy);
-    else wl_display_dispatch_pending(dpy);
+    int r = readable ? wl_display_dispatch(dpy) : wl_display_dispatch_pending(dpy);
+    if (r < 0 || wl_display_get_error(dpy)) {
+        lw_log("Wayland: the connection to the desktop was closed");
+        return false;
+    }
     wl_display_flush(dpy);
+    return true;
 }
 
 static int w_outputs(void) { return n_out; }

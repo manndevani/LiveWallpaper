@@ -129,7 +129,7 @@ A separate, small C program (~80 KB) with the same ideas as the Windows engine. 
 
 | File | Responsibility |
 |---|---|
-| `main.c` | Commands (`-set`, `-list`, `-quit`, `-pause`, `-snapshot`…), the engine loop (`poll()` on the display, a timerfd for frames, a signalfd, libmpv's wake-up eventfd), EGL setup, battery check, XDG autostart entry |
+| `main.c` | Commands (`-set`, `-list`, `-quit`, `-pause`, `-snapshot`, `-lock`…), the engine loop (`poll()` on the display, a timerfd for frames, a signalfd, libmpv's wake-up eventfd), EGL setup, battery check, XDG autostart entry |
 | `config.c` | `~/.config/livewall/config.ini` (same sections and keys as Windows; `autostart` instead of `start_with_windows`). Written atomically (temp file + rename) |
 | `gl.c` | OpenGL ES 2.0: builds shaders as `prelude.glsl` + body + `epilogue.glsl`; Shadertoy-style custom files get a small adapter. Lower resolution renders into a texture that is then stretched. Brightness is a black quad with alpha |
 | `media.c` | Videos, GIFs, pictures through libmpv's render API, loaded with `dlopen` (optional). `hwdec=auto-safe`, `profile=fast`, no audio, small demuxer cache |
@@ -139,4 +139,6 @@ A separate, small C program (~80 KB) with the same ideas as the Windows engine. 
 
 - The shaders live in `shaders/glsl/` and are GLSL ES 1.00 twins of `src/shaders/*.hlsl`. `pos` is in pixels with y down, like Direct3D, so the two versions match line for line. Android and macOS will use the same files.
 - Commands talk to the running engine with signals: they write `config.ini` and send `SIGHUP` (reload), `SIGUSR1` (pause), `SIGUSR2` (resume) or `SIGTERM` (quit). The pid file is `$XDG_RUNTIME_DIR/livewall.pid`, held with `flock`.
+- **Lock screen** (since 2026-11-22). livewall never checks a password. `-lock` runs `swaylock-plugin --command '<livewall> -lockbg'` when that locker is installed: swaylock-plugin locks the session with the Wayland lock protocol and runs `-lockbg` inside its own small Wayland server as the background. `-lockbg` is the normal engine with the `[lockscreen] wallpaper` (same key as Windows; empty = the desktop's), no pid file and no autostart, Wayland only, and it exits when the locker closes its server on unlock. Without swaylock-plugin, `-lock` runs `loginctl lock-session` (the desktop's own locker). `-lock-picture` renders a still of the lock wallpaper for lockers that take a picture.
+- When the Wayland connection closes (the desktop or the locker went away), `dispatch` returns false and the engine exits instead of polling a dead connection.
 - `make -C linux` needs the dev packages listed in `docs/LINUX.md`. The layer-shell protocol XML is kept in `linux/protocols/` (from the wlroots project, permissive license).

@@ -61,6 +61,8 @@ Last updated: 2026-11-22
 - [x] Video, GIF and PNG through libmpv (`-snapshot` and live under Sway).
 - [x] Wayland (headless Sway): draws on the background layer, `-set` switches while running, pauses when a fullscreen window covers it and resumes when it closes, `-pause`/`-resume`, `-quit`.
 - [x] X11 (Xvfb): draws, the pointer moves Glow Grid, `-quit`.
+- [x] Lock screen commands (2026-11-22, headless Sway): `-lock-set` (and `same`), `-lock-picture` (default and given path and size; a silly size is refused), `-lockbg` draws the lock wallpaper (Dunes) while the desktop shows Aurora, `-lock` hands swaylock-plugin a correctly quoted command even for a path with a `'` in it (tested with a stand-in script), and falls back to `loginctl lock-session` without it. When Sway quits, both the engine and the lock background log "the connection to the desktop was closed" and exit (before this fix the engine would have spun on the dead connection).
+- [ ] The real swaylock-plugin hasn't been run yet (it isn't packaged for Ubuntu). Not checked: that it accepts `-lockbg` as its background, and unlock closing it.
 - [ ] Not yet tried on a real Linux PC with a GPU: cost, multi-monitor, HiDPI scale, KDE Plasma, Hyprland, a real X11 desktop with icons, libmpv hardware decoding, the XDG autostart entry, pause on battery.
 - [ ] No settings window or tray icon on Linux yet; everything is a command.
 - [ ] GNOME can't be supported this way (no layer-shell).
@@ -109,7 +111,7 @@ SignPath's conditions: the build must be verifiable from source, each signing ne
 
 - Other platforms: Android and macOS next. They will reuse `shaders/glsl/`.
 - Lock screen on the other platforms, always through the system's own lock (never a home-made password screen):
-  - Linux: hyprlock / swaylock-plugin, or a screen saver plus the desktop's own locker;
+  - Linux: done through swaylock-plugin or the desktop's own locker (see the Linux section above);
   - Android: a live wallpaper shows on the lock screen by itself;
   - macOS: a `.saver` plus "Require password";
   - iOS: export a video or Live Photo only.
