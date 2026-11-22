@@ -16,12 +16,23 @@
 extern "C" {
 #endif
 
-#ifdef LW_TEST_NO_GALLERY /* testing: a host that never answers, as when offline */
+/* Release builds: HTTPS to GitHub Pages only. The two test builds never ship. */
+#if defined(LW_TEST_NO_GALLERY) /* a host that never answers, as when offline */
 #define GALLERY_HOST L"livewall-gallery.invalid"
+#define GALLERY_ROOT L"/livewall-gallery/"
+#elif defined(LW_TEST_LOCAL_GALLERY) /* a test copy of the site on this PC, plain HTTP */
+#define GALLERY_HOST L"127.0.0.1"
+#define GALLERY_ROOT L"/"
+#define GALLERY_PORT 8765
+#define GALLERY_SECURE 0
 #else
 #define GALLERY_HOST L"manndevani.github.io"
-#endif
 #define GALLERY_ROOT L"/livewall-gallery/"
+#endif
+#ifndef GALLERY_PORT
+#define GALLERY_PORT INTERNET_DEFAULT_HTTPS_PORT
+#define GALLERY_SECURE WINHTTP_FLAG_SECURE
+#endif
 #define GALLERY_SHARE_URL L"https://github.com/manndevani/livewall-gallery/blob/main/SHARING.md"
 #define GALLERY_MAX 64
 
@@ -33,6 +44,7 @@ typedef struct {
     char sha[65];     /* of the wallpaper file, lowercase hex */
     char psha[65];    /* of the preview picture */
     DWORD size;
+    DWORD likes;      /* upvotes on its post in the gallery's Discussions */
 } GalleryItem;
 
 /* Downloads and reads index.json. Returns the number of wallpapers, or -1

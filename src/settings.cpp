@@ -863,7 +863,15 @@ void draw_community()
             str_copy(by, L"Download failed: click to try again", 64);
         else
             wsprintfW(by, L"by %s", gi.author);
-        text(by, R(x + 8, ty + 18, x + cw - 8, ty + 36), s.f_small, v.failed ? rgb(0xE5534B) : s.th.faint);
+        float lw = 0;
+        if (gi.likes && !v.failed) { /* likes, right-aligned */
+            WCHAR lk[24];
+            wsprintfW(lk, L"\x2665 %u", gi.likes);
+            lw = text_width(lk, s.f_small) + 6;
+            text(lk, R(x + cw - 8 - lw, ty + 18, x + cw - 8, ty + 36), s.f_small, s.th.faint,
+                 DWRITE_TEXT_ALIGNMENT_TRAILING);
+        }
+        text(by, R(x + 8, ty + 18, x + cw - 8 - lw, ty + 36), s.f_small, v.failed ? rgb(0xE5534B) : s.th.faint);
         hit(clip, ID_GCARD + i);
     }
 

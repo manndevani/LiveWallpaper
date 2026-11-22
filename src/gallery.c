@@ -165,9 +165,9 @@ static BOOL http_get(const WCHAR *rel, BYTE **out, DWORD *len, DWORD max)
         return FALSE;
     str_copy(path, GALLERY_ROOT, 300);
     str_cat(path, rel, 300);
-    c = api.connect(api.session, GALLERY_HOST, INTERNET_DEFAULT_HTTPS_PORT, 0);
+    c = api.connect(api.session, GALLERY_HOST, GALLERY_PORT, 0);
     if (c)
-        r = api.request(c, L"GET", path, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+        r = api.request(c, L"GET", path, NULL, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, GALLERY_SECURE);
     if (r && api.send(r, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
         api.receive(r, NULL) &&
         api.query(r, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status,
@@ -445,6 +445,7 @@ static BOOL jitem(Json *j, GalleryItem *it, BOOL *valid)
             else if (str_ieq(key, L"sha256")) { if (!jstring(j, sha, 80)) return FALSE; }
             else if (str_ieq(key, L"preview_sha256")) { if (!jstring(j, psha, 80)) return FALSE; }
             else if (str_ieq(key, L"size")) { if (!jnumber(j, &it->size)) return FALSE; }
+            else if (str_ieq(key, L"likes")) { if (!jnumber(j, &it->likes)) return FALSE; }
             else if (!jskip(j)) return FALSE;
             if (eat(j, '}'))
                 break;
@@ -516,6 +517,16 @@ int gallery_fetch(GalleryItem *items, int max)
         }
     }
     mem_free(body);
+    if (ok) { /* most liked first; equal ones keep the list's order */
+        static GalleryItem t;
+        int a, b;
+        for (a = 1; a < n; a++) {
+            t = items[a];
+            for (b = a; b > 0 && items[b - 1].likes < t.likes; b--)
+                items[b] = items[b - 1];
+            items[b] = t;
+        }
+    }
     return ok ? n : -1;
 }
 
