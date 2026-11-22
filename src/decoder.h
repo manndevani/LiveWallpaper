@@ -45,9 +45,12 @@ typedef struct {
     double now, length;   /* seconds; length 0 while unknown */
     volatile LONG seek_done; /* = seek_gen once that seek has finished */
     volatile LONG tex_seen;  /* = tex_gen once that texture is in use */
+    LONG player;          /* DECODE_PLAYER_* */
+    HRESULT fallback;     /* why the media engine is used, if it is */
     DWORD test[3];           /* -DLW_TEST_SANDBOX=1: what reading a file, listing a folder and connecting gave */
 } DecodeShare;
 
+enum { DECODE_PLAYER_NONE, DECODE_PLAYER_READER, DECODE_PLAYER_ENGINE };
 enum { DECODE_STARTING, DECODE_READY, DECODE_FAILED };
 enum { DECODE_AT_NONE, DECODE_AT_SHARE, DECODE_AT_DEVICE, DECODE_AT_ENGINE, DECODE_AT_SOURCE,
        DECODE_AT_PLAYBACK, DECODE_AT_TEXTURE };

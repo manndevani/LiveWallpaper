@@ -62,7 +62,14 @@ Last updated: 2026-11-22
   - Paused for 13 s, the helper is closed and the engine is at 0.2 MB. On resume a new helper starts and playback goes on.
   - A broken `.mp4` is reported ("broken.mp4 failed while playing (0xC00D36C4)") and a built-in is shown instead.
   - Costs: about the same graphics card time as decoding in the engine, and less memory (numbers in FINDINGS.md).
-  - **Not yet checked:** the screen saver with a video; the gallery's `-check` on GitHub's Windows machines (it will run on the next gallery change); whether playback resumes at the exact same point after a park (it is asked to); HEVC and AV1, which come from the Store and may not load inside the sandbox.
+  - **Not yet checked:** the screen saver with a video; the gallery's `-check` on GitHub's Windows machines (it will run on the next gallery change); whether playback resumes at the exact same point after a park (it is asked to); AV1, which comes from the Store and may not load inside the sandbox (HEVC from the Store did, on this machine).
+  - Correction (2026-11-23): files with B-frames, which almost every encoder makes, gave a white `-snapshot` (the test videos above had none). Fixed with the change below; playing was not affected.
+- [x] Video helper rewritten on the source reader (2026-11-23), the media engine kept as a fallback. Checked with generated test videos, old player forced by a test build:
+  - Graphics memory about halves: 4K 60 fps 292 → 147 MB on the NVIDIA card; 1080p 84 → 48 MB; on the Intel chip (`integrated_gpu=1`) 4K 343 → 178 MB of RAM. CPU at 720p 1.85% → 0.49%. Commit is higher (4K 160 → ~250 MB, barely touched). Numbers in FINDINGS.md.
+  - Same picture as the old player for turned phone videos (90/180/270°), non-square pixels, full-range colour, 10-bit HEVC and VP9 WebM; better colours for standard-definition BT.601 files.
+  - Loops without a hitch (30 fps through two loop points), pause / park / resume, broken file, 4:3 fit modes, `-snapshot` at several times: as before.
+  - Falls back to the media engine by itself on a software device (`-DLW_FORCE_WARP=1`), logged once.
+  - **Not yet checked:** a file whose size changes mid-stream, interlaced video, HDR (PQ/HLG) files, playback speed other than 1, and a long run (hours) for steady memory.
 
 ## Lock screen on Windows (screen saver, 2026-11-20)
 

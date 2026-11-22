@@ -222,6 +222,27 @@ Measured after the 5 s trim. "Graphics memory" is `\GPU Process Memory(pid_*)\De
   - Telling the media engine to output NV12 instead of BGRA (`MF_MEDIA_ENGINE_VIDEO_OUTPUT_FORMAT`) changed nothing, to the byte. The extra ~150 MB is inside the media engine, and no attribute reaches it.
   - So a helper built on the source reader plus `ID3D11VideoProcessor` (for colour conversion, scaling and the fit) would save roughly 200 MB of graphics memory per 4K video and ~45 MB per 1080p one. The media engine does several things for free that the source reader would leave to us: pacing, looping, playback speed, rotation of phone videos (`MF_MT_VIDEO_ROTATION`), format changes mid-stream, padded surfaces (display aperture), and 10-bit HDR (P010).
 
+## The source-reader player (2026-11-23, same machine)
+
+The helper now decodes with the source reader and converts with the graphics card's video processor; the media engine is kept as a fallback (decoder.c). Measured after the 5 s trim, the old player forced with a test build (`-DLW_FORCE_MEDIA_ENGINE=1`):
+
+| Helper | Media engine (old) | Source reader (new) |
+|---|---|---|
+| 4K 60 fps, NVIDIA | 292 card + 62 shared MB, commit 150–160 MB | **147 card + 38–98 shared MB**, commit 240–267 MB |
+| 1080p 30 fps, NVIDIA | 84 card + 22 shared MB, commit 90 MB | **48 card + 20 shared MB**, commit 113 MB |
+| 4K 60 fps, `integrated_gpu=1` | 343 MB shared (= RAM) | **178 MB shared** |
+| 1080p 30 fps, `integrated_gpu=1` | 119 MB shared | **73 MB shared** |
+| 720p 30 fps, CPU | 1.85% | **0.49%** |
+
+- **Graphics memory roughly halves.** On the integrated chip that is ordinary RAM: 165 MB less for a 4K video.
+- **Commit goes up, working set doesn't.** The source reader reserves ~90 MB more at 4K (~20 MB at 1080p) that it barely touches: the private working set stays 5–20 MB. The shared part moves up and down in steps of ~12 MB (one 4K NV12 frame) while playing; it does not grow over 45 s. No copies to the CPU: the copy engine stays idle and CPU use is lower than before.
+- **`MF_LOW_LATENCY` matters:** without it the same 4K video takes 160 card + 134 shared MB and 350 MB commit.
+- **Picture checks** (`-snapshot` of ffmpeg-made test files against the old player): turned phone videos (90°, 180°, 270°), non-square pixels (720×576 at 16:11) and full-range colour come out the same. `MF_MT_VIDEO_ROTATION` is the counter-clockwise turn already applied to the content; turning it back clockwise with `D3D11_VIDEO_PROCESSOR_ROTATION` by the same amount is right. The video processor's source rectangle is in the decoded frame, before the turn.
+- A standard-definition file tagged BT.601 is now shown with BT.601 colours; the media engine used the HD (BT.709) formula on it (green 0,216,0 instead of 0,255,0). Untagged files use BT.709 from 720 lines up and BT.601 below, as players do.
+- 10-bit HEVC (P010 out) and VP9 in WebM play on the new path inside the sandbox on this machine.
+- **The media engine and B-frames:** for a moment after starting or after a jump, `TransferVideoFrame` succeeds but hands over a blank (white) picture on files with B-frames (almost every encoder makes them; the earlier test videos from the MF sink writer had none). The sandboxed helper drew right after a jump, so `-snapshot` of such files was white. Fixed by drawing only when `OnVideoStreamTick` reports a new frame while playing, and by keeping on asking for frames during a jump (the media engine finishes a jump on such files only while it is asked).
+- The fallback takes over by itself where the new path can't work: on a software device (`-DLW_FORCE_WARP=1`) there is no video device (E_NOINTERFACE), and the media engine plays at 30 fps. The engine logs which player is used when it isn't the new one.
+
 ## Linux port (2026-11-20, tested in WSL2 Ubuntu 26.04, Mesa llvmpipe, no GPU)
 
 - **Same picture as Windows.** `-snapshot` of Aurora and Dunes at 9 s on Linux and on Windows look identical by eye. The GLSL versions use `mod(float)` for HLSL's integer `%`, and y-down pixel positions (`res.y - gl_FragCoord.y`).

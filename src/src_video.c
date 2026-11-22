@@ -22,6 +22,7 @@ static ID3D11Texture2D *tex;
 static IDXGIKeyedMutex *km;
 static UINT tex_w, tex_h;
 static BOOL broken;
+static BOOL told; /* which player, logged once per file */
 static WCHAR parked_path[MAX_PATH]; /* see v_park */
 static double parked_at;
 
@@ -90,6 +91,7 @@ static BOOL v_open(const WCHAR *path, SourceInfo *info)
 
     broken = FALSE;
     if (path != parked_path) {
+        told = FALSE; /* not again on each unpark */
         str_copy(parked_path, path, MAX_PATH); /* remembered for v_park */
         parked_at = 0;
     }
@@ -202,11 +204,17 @@ static BOOL v_draw(const FrameInfo *f, BOOL force)
         return FALSE;
     if (!sh->video_w || !sh->video_h)
         return FALSE; /* not loaded yet */
+    if (!told) {
+        told = TRUE;
+        if (sh->player == DECODE_PLAYER_ENGINE)
+            log_line(L"video: %s plays on Media Foundation's media engine, which uses more memory (0x%08X)",
+                     path_file(parked_path), (UINT)sh->fallback);
+    }
 #if LW_TEST_SANDBOX
     {
-        static BOOL told;
-        if (!told) {
-            told = TRUE;
+        static BOOL told_test;
+        if (!told_test) {
+            told_test = TRUE;
             log_line(L"sandbox test: read a file %u, list a folder %u, connect %u (0 = it worked)", sh->test[0],
                      sh->test[1], sh->test[2]);
         }
