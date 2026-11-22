@@ -17,6 +17,8 @@
 #define STR_(x) #x
 #define STR(x) STR_(x)
 static const char *const gallery_keys[] = {
+    /* manndevani's gallery key, made 2026-11-22 */
+    "425d0a3029245532a38069e6227212f1d2fbec94e79ba998063ea6a94186ced4339f9f98eeaf86e122943d861c15ecd645c3b902187fdb6f7fe830d8b44437cb",
 #ifdef LW_TEST_KEY /* test builds: a throwaway key */
     STR(LW_TEST_KEY),
 #endif
